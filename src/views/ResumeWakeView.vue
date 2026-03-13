@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
+import { listen } from '@tauri-apps/api/event'
 import { ElMessage } from 'element-plus'
 
 const sites = ref([
@@ -42,27 +43,52 @@ function getStatusColor(status: string) {
   return '#999'
 }
 
+function getSiteById(id: string) {
+  return sites.value.find((s) => s.id === id)
+}
+
+let unlisten: (() => void) | undefined
+
+onMounted(async () => {
+  unlisten = await listen<[string, boolean, number | null]>('wake_script_finished', (event) => {
+    const [siteId, success, code] = event.payload
+    const site = getSiteById(siteId)
+    if (!site) return
+    site.status = 'idle'
+    if (code === -1) {
+      ElMessage.warning(`${site.name} 已停止唤醒`)
+    } else if (success) {
+      site.status = 'done'
+      ElMessage.success(`${site.name} 唤醒完成`)
+    } else {
+      ElMessage.error(`${site.name} 唤醒失败`)
+    }
+  })
+})
+
+onUnmounted(() => {
+  unlisten?.()
+})
+
 async function handleAction(site: any) {
   if (site.status === 'running') {
-    // 停止唤醒
-    site.status = 'idle'
-    ElMessage.warning('已停止唤醒')
+    try {
+      await invoke('stop_wake_script')
+      site.status = 'idle'
+    } catch (e) {
+      ElMessage.error('停止失败: ' + String(e))
+    }
     return
   }
 
-  // 开始唤醒
   site.status = 'running'
   ElMessage.info(`开始唤醒 ${site.name}`)
 
   try {
-    const result = await invoke('run_wake_script', { siteId: site.id })
-    site.status = 'done'
-    ElMessage.success(`${site.name} 唤醒完成`)
-    console.log('Script output:', result)
+    await invoke('run_wake_script', { siteId: site.id })
   } catch (error) {
     site.status = 'idle'
-    ElMessage.error(`${site.name} 唤醒失败: ${error}`)
-    console.error('Script error:', error)
+    ElMessage.error(`${site.name} 启动失败: ${error}`)
   }
 }
 </script>
