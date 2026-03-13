@@ -1,18 +1,20 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { invoke } from '@tauri-apps/api/core'
+import { ElMessage } from 'element-plus'
 
 const sites = ref([
   {
     id: 'boss',
     name: 'BOSS直聘',
     logo: new URL('../assets/boss.png', import.meta.url).href,
-    status: 'done',
+    status: 'idle',
   },
   {
     id: 'liepin',
     name: '猎聘',
     logo: new URL('../assets/liepin.png', import.meta.url).href,
-    status: 'running',
+    status: 'idle',
   },
   {
     id: 'zhilian',
@@ -40,11 +42,27 @@ function getStatusColor(status: string) {
   return '#999'
 }
 
-function handleAction(site: any) {
+async function handleAction(site: any) {
   if (site.status === 'running') {
+    // 停止唤醒
     site.status = 'idle'
-  } else {
-    site.status = 'running'
+    ElMessage.warning('已停止唤醒')
+    return
+  }
+
+  // 开始唤醒
+  site.status = 'running'
+  ElMessage.info(`开始唤醒 ${site.name}`)
+
+  try {
+    const result = await invoke('run_wake_script', { siteId: site.id })
+    site.status = 'done'
+    ElMessage.success(`${site.name} 唤醒完成`)
+    console.log('Script output:', result)
+  } catch (error) {
+    site.status = 'idle'
+    ElMessage.error(`${site.name} 唤醒失败: ${error}`)
+    console.error('Script error:', error)
   }
 }
 </script>

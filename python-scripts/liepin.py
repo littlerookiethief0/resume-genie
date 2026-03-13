@@ -21,14 +21,13 @@ class LiepinCrawler:
         self,
         stop_event: Optional[threading.Event] = None,
         on_step: Optional[Callable[[int], None]] = None,
-        **kwargs: Any, 
+        **kwargs: Any,
     ):
         """kwargs 为前端 run_script('boss', { ... }) 传来的参数，可按需使用。"""
         self.config: dict[str, Any] = kwargs
         self.stop_event: Optional[threading.Event] = stop_event
         self.on_step = on_step or (lambda step: None)
         self.browser_manager: PlaywrightBrowserManager = PlaywrightBrowserManager()
-        # 自动判断：有浏览器就CDP连接，没有就新启动
         self.context: BrowserContext = self.browser_manager.start()
         self.browser_manager.close_tabs("liepin")
         self.page: Page = self.context.new_page()
@@ -44,11 +43,11 @@ class LiepinCrawler:
             self.awaken_list_request(response.json())
 
     def login(self):
-        goto_func=lambda:self.page.goto('https://lpt.liepin.com/account/info')
-        login_response=self.browser_manager.action_and_capture(self.page,goto_func,'user-privilege')
+        goto_func = lambda: self.page.goto('https://lpt.liepin.com/account/info')
+        login_response = PlaywrightBrowserManager.action_and_capture(self.page, goto_func, 'user-privilege')
         if not login_response:
             self.page.goto("https://lpt.liepin.com/login")
-            self.page.locator('//span[text()="招聘数据"]').wait_for(state='visible',timeout=60000)
+            self.page.locator('//span[text()="招聘数据"]').wait_for(state='visible', timeout=60000)
         self.on_step(1)  # 步骤1: 登录网站
 
 

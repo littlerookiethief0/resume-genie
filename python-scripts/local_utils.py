@@ -6,6 +6,21 @@ import time
 import random
 from datetime import datetime, timedelta
 from urllib.parse import urlparse, parse_qs
+
+
+def get_data_path(*names):
+    """
+    返回项目数据目录下的路径，用于 Chrome 用户数据等。
+    当从 UI（Tauri）或命令行运行时，均使用项目根目录下的 data 目录。
+    """
+    # __file__ 在 python-scripts/ 下，上一级为项目根
+    _script_dir = os.path.dirname(os.path.abspath(__file__))
+    _project_root = os.path.dirname(_script_dir)
+    _data_dir = os.path.join(_project_root, "data")
+    path = os.path.join(_data_dir, *names)
+    return path
+
+
 def get_cookie_string(context, urls=None):
     """
     从 Playwright 的 context 取出所有 cookie，返回单个字符串（可直接做 Cookie 请求头）。

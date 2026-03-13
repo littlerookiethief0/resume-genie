@@ -21,14 +21,13 @@ class BossCrawler:
         self,
         stop_event: Optional[threading.Event] = None,
         on_step: Optional[Callable[[int], None]] = None,
-        **kwargs: Any, 
+        **kwargs: Any,
     ):
         """kwargs 为前端 run_script('boss', { ... }) 传来的参数，可按需使用。"""
         self.config: dict[str, Any] = kwargs
         self.stop_event: Optional[threading.Event] = stop_event
         self.on_step = on_step or (lambda step: None)
         self.browser_manager: PlaywrightBrowserManager = PlaywrightBrowserManager()
-        # 自动判断：有浏览器就CDP连接，没有就新启动
         self.context: BrowserContext = self.browser_manager.start()
         self.browser_manager.close_tabs("zhipin")
         self.page: Page = self.context.new_page()
