@@ -29,33 +29,37 @@ fn kill_process_by_pid(pid: u32) {
 
 #[tauri::command]
 async fn run_wake_script(app: AppHandle, state: State<'_, WakeScriptState>, site_id: String) -> Result<String, String> {
-    let exe_dir = std::env::current_exe()
-        .map_err(|e| format!("Failed to get exe path: {}", e))?
-        .parent()
-        .ok_or("Failed to get parent dir")?
-        .to_path_buf();
+    // 获取资源目录路径
+    let resource_dir = app.path()
+        .resource_dir()
+        .map_err(|e| format!("Failed to get resource dir: {}", e))?;
 
-    let project_root = exe_dir
-        .parent()
-        .and_then(|p| p.parent())
-        .and_then(|p| p.parent())
-        .ok_or("Failed to find project root")?
-        .to_path_buf();
-
-    let script_path = project_root
+    // Python 脚本路径（打包后在 resources 目录）
+    let script_path = resource_dir
         .join("python-scripts")
         .join(format!("{}.py", site_id));
 
-    let venv_python = project_root
+    // Python 虚拟环境路径
+    #[cfg(target_os = "windows")]
+    let venv_python = resource_dir
+        .join("python-scripts")
+        .join(".venv")
+        .join("Scripts")
+        .join("python.exe");
+
+    #[cfg(not(target_os = "windows"))]
+    let venv_python = resource_dir
         .join("python-scripts")
         .join(".venv")
         .join("bin")
         .join("python");
 
+    // 检查脚本是否存在
     if !script_path.exists() {
         return Err(format!("Script not found: {:?}", script_path));
     }
 
+    // 检查 Python 是否存在
     if !venv_python.exists() {
         return Err(format!("Python venv not found: {:?}", venv_python));
     }
@@ -63,7 +67,7 @@ async fn run_wake_script(app: AppHandle, state: State<'_, WakeScriptState>, site
     let mut child = Command::new(&venv_python)
         .arg("-u")
         .arg(&script_path)
-        .current_dir(project_root.join("python-scripts"))
+        .current_dir(resource_dir.join("python-scripts"))
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .spawn()

@@ -15,9 +15,11 @@ jobs:
           - platform: macos-latest
             target: aarch64-apple-darwin
             name: macOS (Apple Silicon)
+            python-setup: bash scripts/prepare-python.sh
           - platform: windows-latest
             target: x86_64-pc-windows-msvc
             name: Windows (x64)
+            python-setup: scripts\prepare-python.bat
 
     runs-on: ${{ matrix.platform }}
     name: Build ${{ matrix.name }}
@@ -25,6 +27,11 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -50,6 +57,9 @@ jobs:
         if: matrix.platform == 'macos-latest'
         run: |
           rustup target add aarch64-apple-darwin
+
+      - name: Prepare Python environment
+        run: ${{ matrix.python-setup }}
 
       - name: Install frontend dependencies
         run: pnpm install
