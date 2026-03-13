@@ -1,7 +1,8 @@
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::thread;
-use tauri::{AppHandle, Emitter, State};
+use tauri::{AppHandle, Emitter, State, Manager};
+
 
 /// 当前正在运行的唤醒脚本： (pid, site_id)
 struct WakeScriptState(Arc<Mutex<Option<(u32, String)>>>);
