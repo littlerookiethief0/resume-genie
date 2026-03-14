@@ -35,11 +35,4 @@ else
     echo "⚠️  未找到 requirements.txt，跳过依赖安装"
 fi
 
-# 安装 Playwright 浏览器（如果需要）
-if pip list | grep -q playwright; then
-    echo "🌐 安装 Playwright 浏览器..."
-    playwright install chromium
-    echo "✅ Playwright 浏览器安装完成"
-fi
-
 echo "✅ Python 环境准备完成"
