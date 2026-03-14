@@ -154,12 +154,10 @@ pub fn run() {
 
             // 处理窗口关闭事件：最小化到托盘而不是退出
             if let Some(window) = app.get_webview_window("main") {
-                window.on_window_event(|event| {
+                window.on_window_event(move |event| {
                     if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                         api.prevent_close();
-                        if let Some(window) = event.window().get_webview_window("main") {
-                            let _ = window.hide();
-                        }
+                        let _ = event.window().hide();
                     }
                 });
             }
