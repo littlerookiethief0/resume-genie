@@ -3,6 +3,9 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use tauri::{AppHandle, Emitter, State, Manager};
 
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
 
 /// 当前正在运行的唤醒脚本： (pid, site_id)
 struct WakeScriptState(Arc<Mutex<Option<(u32, String)>>>);
@@ -63,13 +66,18 @@ async fn run_wake_script(app: AppHandle, state: State<'_, WakeScriptState>, site
         return Err(format!("Python not found: {:?}", python_exe));
     }
 
-    let mut child = Command::new(&python_exe)
-        .arg("-u")
+    let mut cmd = Command::new(&python_exe);
+    cmd.arg("-u")
         .arg(&script_path)
         .current_dir(&script_dir)
         .stdout(Stdio::inherit())
-        .stderr(Stdio::inherit())
-        .spawn()
+        .stderr(Stdio::inherit());
+
+    // Windows: 隐藏控制台窗口
+    #[cfg(windows)]
+    cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+
+    let mut child = cmd.spawn()
         .map_err(|e| format!("Failed to execute script: {}", e))?;
 
     let pid = child.id();
