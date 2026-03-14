@@ -2,6 +2,8 @@ use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use tauri::{AppHandle, Emitter, State, Manager};
+use tauri::menu::{Menu, MenuItem};
+use tauri::tray::{TrayIconBuilder, TrayIconEvent};
 
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
@@ -116,6 +118,54 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .manage(WakeScriptState(Arc::new(Mutex::new(None))))
         .invoke_handler(tauri::generate_handler![greet, run_wake_script, stop_wake_script])
+        .setup(|app| {
+            // 创建托盘菜单
+            let show = MenuItem::with_id(app, "show", "显示", true, None::<&str>)?;
+            let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
+            let menu = Menu::with_items(app, &[&show, &quit])?;
+
+            // 创建系统托盘
+            let _tray = TrayIconBuilder::new()
+                .menu(&menu)
+                .on_menu_event(|app, event| {
+                    match event.id.as_ref() {
+                        "show" => {
+                            if let Some(window) = app.get_webview_window("main") {
+                                let _ = window.show();
+                                let _ = window.set_focus();
+                            }
+                        }
+                        "quit" => {
+                            app.exit(0);
+                        }
+                        _ => {}
+                    }
+                })
+                .on_tray_icon_event(|tray, event| {
+                    if let TrayIconEvent::Click { .. } = event {
+                        let app = tray.app_handle();
+                        if let Some(window) = app.get_webview_window("main") {
+                            let _ = window.show();
+                            let _ = window.set_focus();
+                        }
+                    }
+                })
+                .build(app)?;
+
+            // 处理窗口关闭事件：最小化到托盘而不是退出
+            if let Some(window) = app.get_webview_window("main") {
+                window.on_window_event(|event| {
+                    if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                        api.prevent_close();
+                        if let Some(window) = event.window().get_webview_window("main") {
+                            let _ = window.hide();
+                        }
+                    }
+                });
+            }
+
+            Ok(())
+        })
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
