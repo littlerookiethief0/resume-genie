@@ -158,7 +158,7 @@ def wait_for_condition(page, check_func, timeout_ms=600000):
         page.wait_for_timeout(200) 
 
 
-def scroll_load_bottom(func,timeout_ms=2000000):
+def scroll_load_bottom(func,timeout_ms=3600000):
     start_time = time.time()
     timeout_sec = timeout_ms / 1000.0  # 👈 转换为秒
     while True:
@@ -167,5 +167,6 @@ def scroll_load_bottom(func,timeout_ms=2000000):
         except Exception as e:
             return 'finish'
         finally:
+            time.sleep(random.uniform(0.1, 0.4))
             if time.time() - start_time > timeout_sec:
                 return 'timeout'
