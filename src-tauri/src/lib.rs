@@ -46,19 +46,24 @@ async fn run_wake_script(app: AppHandle, state: State<'_, WakeScriptState>, site
 
     let script_path = script_dir.join(format!("{}.py", site_id));
 
-    // 使用系统 Python
-    let python_cmd = if cfg!(target_os = "windows") {
-        "python"
-    } else {
-        "python3"
-    };
+    // 使用打包的 standalone Python
+    #[cfg(target_os = "windows")]
+    let python_exe = script_dir.join("python").join("python.exe");
+
+    #[cfg(not(target_os = "windows"))]
+    let python_exe = script_dir.join("python").join("bin").join("python3");
 
     // 检查脚本是否存在
     if !script_path.exists() {
         return Err(format!("Script not found: {:?}", script_path));
     }
 
-    let mut child = Command::new(python_cmd)
+    // 检查 Python 是否存在
+    if !python_exe.exists() {
+        return Err(format!("Python not found: {:?}", python_exe));
+    }
+
+    let mut child = Command::new(&python_exe)
         .arg("-u")
         .arg(&script_path)
         .current_dir(&script_dir)

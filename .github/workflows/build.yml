@@ -65,8 +65,25 @@ jobs:
         run: |
           rustup target add aarch64-apple-darwin
 
-      - name: Prepare Python environment
-        run: ${{ matrix.python-setup }}
+      - name: Download standalone Python (macOS)
+        if: matrix.platform == 'macos-latest'
+        run: |
+          cd python-scripts
+          curl -L https://github.com/indygreg/python-build-standalone/releases/download/20241016/cpython-3.12.7+20241016-aarch64-apple-darwin-install_only_stripped.tar.gz -o python.tar.gz
+          mkdir -p python
+          tar -xzf python.tar.gz -C python --strip-components=1
+          rm python.tar.gz
+          ./python/bin/python3 -m pip install -r requirements.txt
+
+      - name: Download standalone Python (Windows)
+        if: matrix.platform == 'windows-latest'
+        run: |
+          cd python-scripts
+          curl -L https://github.com/indygreg/python-build-standalone/releases/download/20241016/cpython-3.12.7+20241016-x86_64-pc-windows-msvc-shared-install_only_stripped.tar.gz -o python.tar.gz
+          mkdir python
+          tar -xzf python.tar.gz -C python --strip-components=1
+          del python.tar.gz
+          python\python.exe -m pip install -r requirements.txt
 
       - name: Install frontend dependencies
         run: pnpm install
