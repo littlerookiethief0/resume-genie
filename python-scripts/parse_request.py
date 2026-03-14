@@ -1,4 +1,6 @@
 import requests
+import time
+import random
 
 _session = requests.Session()
 boss_parse_url="https://jobdig.100dp.com/api/resume/convert/convertBoss"
@@ -6,14 +8,17 @@ zhilian_parse_url="https://jobdig.100dp.com/api/resume/convert/convertZhilian"
 liepin_parse_url="https://jobdig.100dp.com/api/resume/convert/convertLiepin"
 
 def boss_parse_request(data):
+    time.sleep(random.uniform(0.1, 0.4))
     response=_session.post(boss_parse_url,json=data)
     return response.json()
 
 def zhilian_parse_request(data):
+    time.sleep(random.uniform(0.1, 0.4))
     response=_session.post(zhilian_parse_url,json=data)
     return response.json()
 
 def liepin_parse_request(data):
+    time.sleep(random.uniform(0.1, 0.4))
     response=_session.post(liepin_parse_url,json=data)
     return response.json()
 
