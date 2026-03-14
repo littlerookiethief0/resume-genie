@@ -36,42 +36,32 @@ async fn run_wake_script(app: AppHandle, state: State<'_, WakeScriptState>, site
         .map_err(|e| format!("Failed to get resource dir: {}", e))?;
 
     // Python 脚本路径（打包后在 resources 目录）
-    let script_path = resource_dir
-        .join("_up_")
-        .join("python-scripts")
-        .join(format!("{}.py", site_id));
+    // macOS: Resources/_up_/python-scripts/
+    // Windows: AppData/Local/app-name/python-scripts/
+    let script_dir = if resource_dir.join("_up_").join("python-scripts").exists() {
+        resource_dir.join("_up_").join("python-scripts")
+    } else {
+        resource_dir.join("python-scripts")
+    };
 
-    // Python 虚拟环境路径
-    #[cfg(target_os = "windows")]
-    let venv_python = resource_dir
-        .join("_up_")
-        .join("python-scripts")
-        .join(".venv")
-        .join("Scripts")
-        .join("python.exe");
+    let script_path = script_dir.join(format!("{}.py", site_id));
 
-    #[cfg(not(target_os = "windows"))]
-    let venv_python = resource_dir
-        .join("_up_")
-        .join("python-scripts")
-        .join(".venv")
-        .join("bin")
-        .join("python");
+    // 使用系统 Python
+    let python_cmd = if cfg!(target_os = "windows") {
+        "python"
+    } else {
+        "python3"
+    };
 
     // 检查脚本是否存在
     if !script_path.exists() {
         return Err(format!("Script not found: {:?}", script_path));
     }
 
-    // 检查 Python 是否存在
-    if !venv_python.exists() {
-        return Err(format!("Python venv not found: {:?}", venv_python));
-    }
-
-    let mut child = Command::new(&venv_python)
+    let mut child = Command::new(python_cmd)
         .arg("-u")
         .arg(&script_path)
-        .current_dir(resource_dir.join("_up_").join("python-scripts"))
+        .current_dir(&script_dir)
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .spawn()
