@@ -4,6 +4,7 @@ use std::thread;
 use tauri::{AppHandle, Emitter, State, Manager};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{TrayIconBuilder, TrayIconEvent};
+use tauri::image::Image;
 
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
@@ -119,6 +120,12 @@ pub fn run() {
         .manage(WakeScriptState(Arc::new(Mutex::new(None))))
         .invoke_handler(tauri::generate_handler![greet, run_wake_script, stop_wake_script])
         .setup(|app| {
+            // 加载托盘图标
+            let icon_bytes = include_bytes!("../icons/icon.png");
+            let img = image::load_from_memory(icon_bytes).expect("Failed to load icon").to_rgba8();
+            let (width, height) = img.dimensions();
+            let icon = Image::new_owned(img.into_raw(), width, height);
+
             // 创建托盘菜单
             let show = MenuItem::with_id(app, "show", "显示", true, None::<&str>)?;
             let quit = MenuItem::with_id(app, "quit", "退出", true, None::<&str>)?;
@@ -126,7 +133,7 @@ pub fn run() {
 
             // 创建系统托盘
             let _tray = TrayIconBuilder::new()
-                .icon(app.default_window_icon().unwrap().clone())
+                .icon(icon)
                 .menu(&menu)
                 .on_menu_event(|app, event| {
                     match event.id.as_ref() {
