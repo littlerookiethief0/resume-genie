@@ -154,10 +154,11 @@ pub fn run() {
 
             // 处理窗口关闭事件：最小化到托盘而不是退出
             if let Some(window) = app.get_webview_window("main") {
+                let window_clone = window.clone();
                 window.on_window_event(move |event| {
                     if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                         api.prevent_close();
-                        let _ = event.window().hide();
+                        let _ = window_clone.hide();
                     }
                 });
             }
