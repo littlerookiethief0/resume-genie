@@ -42,8 +42,7 @@
     "shortDescription": "简历精灵 - 智能简历管理工具",
     "longDescription": "简历精灵是一款智能简历管理工具，帮助您自动唤醒和管理招聘网站上的简历。",
     "resources": [
-      "../python-scripts/*.py",
-      "../python-scripts/.venv/**/*"
+      "../python-scripts"
     ],
     "macOS": {
       "minimumSystemVersion": "10.15"
