@@ -1,6 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
-  "productName": "resume-genie",
+  "productName": "简历精灵",
   "version": "0.1.0",
   "identifier": "com.resumegenie.app",
   "build": {
