@@ -37,12 +37,14 @@ async fn run_wake_script(app: AppHandle, state: State<'_, WakeScriptState>, site
 
     // Python 脚本路径（打包后在 resources 目录）
     let script_path = resource_dir
+        .join("_up_")
         .join("python-scripts")
         .join(format!("{}.py", site_id));
 
     // Python 虚拟环境路径
     #[cfg(target_os = "windows")]
     let venv_python = resource_dir
+        .join("_up_")
         .join("python-scripts")
         .join(".venv")
         .join("Scripts")
@@ -50,6 +52,7 @@ async fn run_wake_script(app: AppHandle, state: State<'_, WakeScriptState>, site
 
     #[cfg(not(target_os = "windows"))]
     let venv_python = resource_dir
+        .join("_up_")
         .join("python-scripts")
         .join(".venv")
         .join("bin")
@@ -68,7 +71,7 @@ async fn run_wake_script(app: AppHandle, state: State<'_, WakeScriptState>, site
     let mut child = Command::new(&venv_python)
         .arg("-u")
         .arg(&script_path)
-        .current_dir(resource_dir.join("python-scripts"))
+        .current_dir(resource_dir.join("_up_").join("python-scripts"))
         .stdout(Stdio::inherit())
         .stderr(Stdio::inherit())
         .spawn()
