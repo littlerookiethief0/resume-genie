@@ -31,20 +31,30 @@ const sites = ref([
   }
 ])
 
+function getSiteById(id: string) {
+  return sites.value.find((s) => s.id === id)
+}
+
 function getStatusText(status: string) {
-  if (status === 'done') return '今日已唤醒'
-  if (status === 'running') return '正在唤醒中'
-  return '今日未唤醒'
+  switch (status) {
+    case 'running':
+      return '正在唤醒中'
+    case 'done':
+      return '今日已唤醒'
+    default:
+      return '今日未唤醒'
+  }
 }
 
 function getStatusColor(status: string) {
-  if (status === 'done') return '#67c23a'
-  if (status === 'running') return '#e6a23c'
-  return '#999'
-}
-
-function getSiteById(id: string) {
-  return sites.value.find((s) => s.id === id)
+  switch (status) {
+    case 'running':
+      return '#e6a23c'
+    case 'done':
+      return '#67c23a'
+    default:
+      return '#999'
+  }
 }
 
 let unlisten: (() => void) | undefined
@@ -232,7 +242,14 @@ async function handleAction(site: any) {
 }
 
 .site-status {
-  font-size: 13px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.site-info {
+  font-size: 12px;
+  color: #666;
+  line-height: 1.6;
 }
 
 .action {

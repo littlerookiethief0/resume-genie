@@ -1,5 +1,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
+import { invoke } from '@tauri-apps/api/core'
+import { ElMessage } from 'element-plus'
 
 const autoParseEnabled = ref(true)
 
@@ -8,6 +10,8 @@ const sites = ref([
     id: 'boss',
     name: 'BOSS直聘',
     logo: new URL('../assets/boss.png', import.meta.url).href,
+    timeFilter: 7,
+    downloadDir: './boss_resume',
     accounts: [
       { username: '13980987897', lastParseTime: '2025-11-24 17:25:34' },
       { username: '13980987897', lastParseTime: '2025-11-24 17:25:34' }
@@ -17,6 +21,8 @@ const sites = ref([
     id: 'liepin',
     name: '猎聘',
     logo: new URL('../assets/liepin.png', import.meta.url).href,
+    timeFilter: 7,
+    downloadDir: './liepin_resume',
     accounts: [
       { username: '13980987897', lastParseTime: '2025-11-24 17:25:34' }
     ]
@@ -25,6 +31,8 @@ const sites = ref([
     id: 'zhilian',
     name: '智联招聘',
     logo: new URL('../assets/zhilian.png', import.meta.url).href,
+    timeFilter: 7,
+    downloadDir: './zhilian_resume',
     accounts: [
       { username: '13980987897', lastParseTime: '2025-11-24 17:25:34' },
       { username: '13980987897', lastParseTime: '2025-11-24 17:25:34' },
@@ -35,11 +43,21 @@ const sites = ref([
     id: 'qiancheng',
     name: '前程无忧',
     logo: new URL('../assets/qcwy.png', import.meta.url).href,
+    timeFilter: 7,
+    downloadDir: './qiancheng_resume',
     accounts: [
       { username: '13980987897', lastParseTime: '2025-11-24 17:25:34' }
     ]
   }
 ])
+
+async function openDirectory(path: string) {
+  try {
+    await invoke('open_directory', { path })
+  } catch (error) {
+    ElMessage.error('打开目录失败: ' + String(error))
+  }
+}
 </script>
 
 <template>
@@ -58,6 +76,8 @@ const sites = ref([
       <div class="list-header">
         <span>网站</span>
         <span>最近解析时间</span>
+        <span>时间过滤</span>
+        <span>下载目录</span>
         <span class="header-action">操作</span>
       </div>
 
@@ -71,6 +91,19 @@ const sites = ref([
             <span class="account-username">用户名：{{ account.username }}</span>
             <span class="account-time">{{ account.lastParseTime }}</span>
           </div>
+        </div>
+        <div class="time-filter">
+          <el-input-number
+            v-model="site.timeFilter"
+            :min="1"
+            :max="365"
+            size="small"
+            controls-position="right"
+          />
+          <span style="margin-left: 8px; font-size: 12px; color: #999">天内</span>
+        </div>
+        <div class="download-dir">
+          <span class="dir-path" @click="openDirectory(site.downloadDir)">简历目录</span>
         </div>
         <div class="action">
           <el-button link type="primary">开始</el-button>
@@ -127,7 +160,7 @@ const sites = ref([
 
 .list-header {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: 1.2fr 1.5fr 1fr 1fr 0.8fr;
   padding: 12px 24px;
   font-size: 13px;
   color: #999;
@@ -140,7 +173,7 @@ const sites = ref([
 
 .site-row {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: 1.2fr 1.5fr 1fr 1fr 0.8fr;
   padding: 16px 24px;
   align-items: center;
   border-bottom: 1px solid #f5f5f5;
@@ -191,6 +224,27 @@ const sites = ref([
 .account-time {
   color: #999;
   white-space: nowrap;
+}
+
+.time-filter {
+  display: flex;
+  align-items: center;
+}
+
+.download-dir {
+  display: flex;
+  align-items: center;
+}
+
+.dir-path {
+  font-size: 12px;
+  color: #409eff;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.dir-path:hover {
+  color: #66b1ff;
 }
 
 .action {

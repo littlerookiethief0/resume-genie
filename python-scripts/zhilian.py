@@ -55,6 +55,8 @@ class ZhilianCrawler:
         person_list=response['data']['list']
         for person in person_list:
             try:
+                # 随机延时，模拟人工操作间隔
+                time.sleep(random.uniform(1.5, 4))
                 parse_data=parse_request.zhilian_parse_request(person)['data']
                 mopin_data=mopin_request.awaken_request(parse_data)
                 wake_resume_dict = json.loads(mopin_data['data']['wakeResume'])

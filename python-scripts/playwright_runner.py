@@ -34,7 +34,11 @@ class PlaywrightBrowserManager:
             args=[
                 "--start-maximized",
                 "--remote-debugging-port=9222",
+                "--disable-blink-features=AutomationControlled",
+                "--disable-features=IsolateOrigins,site-per-process",
+                "--disable-site-isolation-trials",
             ],
+            ignore_default_args=["--enable-automation"],
         )
         return self.context
 
@@ -105,6 +109,30 @@ class PlaywrightBrowserManager:
         os.makedirs(os.path.dirname(save_path) or ".", exist_ok=True)
         with open(download.path(), "rb") as f:
             binary_data = f.read()
+        with open(save_path, "wb") as f:
+            f.write(binary_data)
+        return binary_data
+
+    
+    def action_and_download_binary(self, page, action, save_path, timeout=30000):
+        """
+        执行动作触发下载，将文件保存到 save_path，并返回 PDF 二进制数据。
+
+        参数:
+            page: Playwright 页面
+            action: 触发下载的 lambda，如 lambda: page.locator("...").click()
+            save_path: 保存文件的完整路径（含文件名）
+        返回:
+            bytes: 文件二进制数据
+        """
+        with page.expect_download(timeout=timeout) as download_info:
+            action()
+        download = download_info.value
+        with open(download.path(), "rb") as f:
+            binary_data = f.read()
+        dirpart = os.path.dirname(save_path)
+        if dirpart:
+            os.makedirs(dirpart, exist_ok=True)
         with open(save_path, "wb") as f:
             f.write(binary_data)
         return binary_data

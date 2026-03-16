@@ -163,10 +163,13 @@ def scroll_load_bottom(func,timeout_ms=3600000):
     timeout_sec = timeout_ms / 1000.0  # 👈 转换为秒
     while True:
         try:
+            # 随机延时，模拟人类阅读和思考时间
+            time.sleep(random.uniform(2, 5))
             func()
+            # 操作后再随机停留
+            time.sleep(random.uniform(1, 3))
         except Exception as e:
             return 'finish'
         finally:
-            time.sleep(random.uniform(0.1, 0.4))
             if time.time() - start_time > timeout_sec:
                 return 'timeout'

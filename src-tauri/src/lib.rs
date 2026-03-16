@@ -9,9 +9,6 @@ use tauri::image::Image;
 #[cfg(target_os = "macos")]
 use tauri::ActivationPolicy;
 
-#[cfg(windows)]
-use std::os::windows::process::CommandExt;
-
 
 /// 当前正在运行的唤醒脚本： (pid, site_id)
 struct WakeScriptState(Arc<Mutex<Option<(u32, String)>>>);
@@ -47,20 +44,29 @@ async fn run_wake_script(app: AppHandle, state: State<'_, WakeScriptState>, site
     // Python 脚本路径（打包后在 resources 目录）
     // macOS: Resources/_up_/python-scripts/
     // Windows: AppData/Local/app-name/python-scripts/
-    let script_dir = if resource_dir.join("_up_").join("python-scripts").exists() {
-        resource_dir.join("_up_").join("python-scripts")
+    let (script_dir, python_exe) = if resource_dir.join("_up_").join("python-scripts").exists() {
+        // 生产模式：使用打包的 Python
+        let dir = resource_dir.join("_up_").join("python-scripts");
+        #[cfg(target_os = "windows")]
+        let python = dir.join("python").join("python.exe");
+        #[cfg(not(target_os = "windows"))]
+        let python = dir.join("python").join("bin").join("python3");
+        (dir, python)
     } else {
-        resource_dir.join("python-scripts")
+        // 开发模式：使用项目根目录的脚本和虚拟环境的 Python
+        let project_root = resource_dir.parent().unwrap().to_path_buf();
+        let dir = project_root.join("python-scripts");
+
+        // 优先使用虚拟环境的 Python
+        #[cfg(target_os = "windows")]
+        let python = dir.join(".venv").join("Scripts").join("python.exe");
+        #[cfg(not(target_os = "windows"))]
+        let python = dir.join(".venv").join("bin").join("python3");
+
+        (dir, python)
     };
 
     let script_path = script_dir.join(format!("{}.py", site_id));
-
-    // 使用打包的 standalone Python
-    #[cfg(target_os = "windows")]
-    let python_exe = script_dir.join("python").join("python.exe");
-
-    #[cfg(not(target_os = "windows"))]
-    let python_exe = script_dir.join("python").join("bin").join("python3");
 
     // 检查脚本是否存在
     if !script_path.exists() {
@@ -116,12 +122,89 @@ async fn stop_wake_script(state: State<'_, WakeScriptState>, app: AppHandle) -> 
     Ok("Script stopped".to_string())
 }
 
+#[tauri::command]
+async fn select_directory(app: AppHandle) -> Result<String, String> {
+    use tauri_plugin_dialog::DialogExt;
+
+    let folder = app.dialog()
+        .file()
+        .blocking_pick_folder();
+
+    match folder {
+        Some(path) => Ok(path.to_string()),
+        None => Err("未选择目录".to_string()),
+    }
+}
+
+#[tauri::command]
+async fn open_directory(app: AppHandle, path: String) -> Result<(), String> {
+    // 获取资源目录路径
+    let resource_dir = app.path()
+        .resource_dir()
+        .map_err(|e| format!("Failed to get resource dir: {}", e))?;
+
+    // 如果是相对路径，转换为绝对路径
+    let abs_path = if path.starts_with("./") || path.starts_with(".\\") {
+        // 去掉 ./ 或 .\
+        let relative = path.trim_start_matches("./").trim_start_matches(".\\");
+
+        // 在开发模式下，使用项目根目录
+        // 在生产模式下，使用资源目录的父目录
+        let base_dir = if resource_dir.join("_up_").exists() {
+            // 生产模式：Resources/_up_/
+            resource_dir.parent().unwrap().parent().unwrap().to_path_buf()
+        } else {
+            // 开发模式：项目根目录
+            resource_dir.parent().unwrap().to_path_buf()
+        };
+
+        base_dir.join(relative)
+    } else {
+        std::path::PathBuf::from(&path)
+    };
+
+    // 如果目录不存在，创建它
+    if !abs_path.exists() {
+        std::fs::create_dir_all(&abs_path)
+            .map_err(|e| format!("Failed to create directory: {}", e))?;
+    }
+
+    let path_str = abs_path.to_string_lossy().to_string();
+
+    #[cfg(target_os = "macos")]
+    {
+        Command::new("open")
+            .arg(&path_str)
+            .spawn()
+            .map_err(|e| format!("Failed to open directory: {}", e))?;
+    }
+
+    #[cfg(target_os = "windows")]
+    {
+        Command::new("explorer")
+            .arg(&path_str)
+            .spawn()
+            .map_err(|e| format!("Failed to open directory: {}", e))?;
+    }
+
+    #[cfg(target_os = "linux")]
+    {
+        Command::new("xdg-open")
+            .arg(&path_str)
+            .spawn()
+            .map_err(|e| format!("Failed to open directory: {}", e))?;
+    }
+
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
+        .plugin(tauri_plugin_dialog::init())
         .manage(WakeScriptState(Arc::new(Mutex::new(None))))
-        .invoke_handler(tauri::generate_handler![greet, run_wake_script, stop_wake_script])
+        .invoke_handler(tauri::generate_handler![greet, run_wake_script, stop_wake_script, select_directory, open_directory])
         .setup(|app| {
             // 设置应用激活策略，使其不出现在 Dock
         // macOS: 隐藏 Dock 图标
