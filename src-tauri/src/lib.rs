@@ -1,10 +1,13 @@
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::thread;
-use tauri::{AppHandle, Emitter, State, Manager, ActivationPolicy};
+use tauri::{AppHandle, Emitter, State, Manager};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{TrayIconBuilder, TrayIconEvent};
 use tauri::image::Image;
+
+#[cfg(target_os = "macos")]
+use tauri::ActivationPolicy;
 
 #[cfg(windows)]
 use std::os::windows::process::CommandExt;
@@ -121,7 +124,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![greet, run_wake_script, stop_wake_script])
         .setup(|app| {
             // 设置应用激活策略，使其不出现在 Dock
-        app.set_activation_policy(tauri::ActivationPolicy::Accessory)?;
+        // macOS: 隐藏 Dock 图标
+        #[cfg(target_os = "macos")]
+        app.set_activation_policy(tauri::ActivationPolicy::Accessory);
         // 加载托盘图标
             let icon_bytes = include_bytes!("../icons/icon.png");
             let img = image::load_from_memory(icon_bytes).expect("Failed to load icon").to_rgba8();
