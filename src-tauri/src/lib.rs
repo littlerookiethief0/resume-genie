@@ -9,6 +9,9 @@ use tauri::image::Image;
 #[cfg(target_os = "macos")]
 use tauri::ActivationPolicy;
 
+#[cfg(target_os = "windows")]
+use std::os::windows::process::CommandExt;
+
 
 /// 当前正在运行的唤醒脚本： (pid, site_id)
 struct WakeScriptState(Arc<Mutex<Option<(u32, String)>>>);
@@ -41,23 +44,29 @@ async fn run_wake_script(app: AppHandle, state: State<'_, WakeScriptState>, site
         .resource_dir()
         .map_err(|e| format!("Failed to get resource dir: {}", e))?;
 
-    // Python 脚本路径（打包后在 resources 目录）
-    // macOS: Resources/_up_/python-scripts/
-    // Windows: AppData/Local/app-name/python-scripts/
-    let (script_dir, python_exe) = if resource_dir.join("_up_").join("python-scripts").exists() {
+    // 尝试使用打包的 Python（生产模式）
+    let packaged_dir = resource_dir.join("_up_").join("python-scripts");
+    #[cfg(target_os = "windows")]
+    let packaged_python = packaged_dir.join("python").join("python.exe");
+    #[cfg(not(target_os = "windows"))]
+    let packaged_python = packaged_dir.join("python").join("bin").join("python3");
+
+    let (script_dir, python_exe) = if packaged_python.exists() {
         // 生产模式：使用打包的 Python
-        let dir = resource_dir.join("_up_").join("python-scripts");
-        #[cfg(target_os = "windows")]
-        let python = dir.join("python").join("python.exe");
-        #[cfg(not(target_os = "windows"))]
-        let python = dir.join("python").join("bin").join("python3");
-        (dir, python)
+        (packaged_dir, packaged_python)
     } else {
         // 开发模式：使用项目根目录的脚本和虚拟环境的 Python
-        let project_root = resource_dir.parent().unwrap().to_path_buf();
+        // resource_dir 是 src-tauri/target/debug，需要往上三层到项目根目录
+        let project_root = resource_dir
+            .parent()  // src-tauri/target
+            .unwrap()
+            .parent()  // src-tauri
+            .unwrap()
+            .parent()  // 项目根目录
+            .unwrap()
+            .to_path_buf();
         let dir = project_root.join("python-scripts");
 
-        // 优先使用虚拟环境的 Python
         #[cfg(target_os = "windows")]
         let python = dir.join(".venv").join("Scripts").join("python.exe");
         #[cfg(not(target_os = "windows"))]
