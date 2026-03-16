@@ -16,6 +16,9 @@ use std::os::windows::process::CommandExt;
 /// 当前正在运行的唤醒脚本： (pid, site_id)
 struct WakeScriptState(Arc<Mutex<Option<(u32, String)>>>);
 
+/// 当前正在运行的解析脚本： (pid, site_id)
+struct ParseScriptState(Arc<Mutex<Option<(u32, String)>>>);
+
 #[tauri::command]
 fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
@@ -132,6 +135,91 @@ async fn stop_wake_script(state: State<'_, WakeScriptState>, app: AppHandle) -> 
 }
 
 #[tauri::command]
+async fn stop_parse_script(state: State<'_, ParseScriptState>, app: AppHandle) -> Result<String, String> {
+    let Some((pid, site_id)) = state.0.lock().unwrap().take() else {
+        return Ok("No script running".to_string());
+    };
+
+    kill_process_by_pid(pid);
+    let _ = app.emit("parse_script_finished", (site_id, false, Some(-1i32)));
+
+    Ok("Script stopped".to_string())
+}
+
+#[tauri::command]
+async fn run_parse_script(app: AppHandle, state: State<'_, ParseScriptState>, site_id: String, days: i32) -> Result<String, String> {
+    let resource_dir = app.path()
+        .resource_dir()
+        .map_err(|e| format!("Failed to get resource dir: {}", e))?;
+
+    let packaged_dir = resource_dir.join("_up_").join("python-scripts");
+    #[cfg(target_os = "windows")]
+    let packaged_python = packaged_dir.join("python").join("python.exe");
+    #[cfg(not(target_os = "windows"))]
+    let packaged_python = packaged_dir.join("python").join("bin").join("python3");
+
+    let (script_dir, python_exe) = if packaged_python.exists() {
+        (packaged_dir, packaged_python)
+    } else {
+        let project_root = resource_dir
+            .parent().unwrap()
+            .parent().unwrap()
+            .parent().unwrap()
+            .to_path_buf();
+        let dir = project_root.join("python-scripts");
+
+        #[cfg(target_os = "windows")]
+        let python = dir.join(".venv").join("Scripts").join("python.exe");
+        #[cfg(not(target_os = "windows"))]
+        let python = dir.join(".venv").join("bin").join("python3");
+
+        (dir, python)
+    };
+
+    let script_path = script_dir.join(format!("{}_resume.py", site_id));
+
+    if !script_path.exists() {
+        return Err(format!("Script not found: {:?}", script_path));
+    }
+
+    if !python_exe.exists() {
+        return Err(format!("Python not found: {:?}", python_exe));
+    }
+
+    let mut cmd = Command::new(&python_exe);
+    cmd.arg("-u")
+        .arg(&script_path)
+        .arg("--days")
+        .arg(days.to_string())
+        .current_dir(&script_dir)
+        .stdout(Stdio::inherit())
+        .stderr(Stdio::inherit());
+
+    #[cfg(windows)]
+    cmd.creation_flags(0x08000000);
+
+    let mut child = cmd.spawn()
+        .map_err(|e| format!("Failed to execute script: {}", e))?;
+
+    let pid = child.id();
+    let site_id_clone = site_id.clone();
+    *state.0.lock().unwrap() = Some((pid, site_id.clone()));
+
+    let state_inner = Arc::clone(&state.0);
+    thread::spawn(move || {
+        let status = child.wait();
+        state_inner.lock().unwrap().take();
+        let (success, code) = match &status {
+            Ok(s) => (s.success(), s.code()),
+            Err(_) => (false, None),
+        };
+        let _ = app.emit("parse_script_finished", (site_id_clone, success, code));
+    });
+
+    Ok("Parse script started".to_string())
+}
+
+#[tauri::command]
 async fn select_directory(app: AppHandle) -> Result<String, String> {
     use tauri_plugin_dialog::DialogExt;
 
@@ -147,27 +235,27 @@ async fn select_directory(app: AppHandle) -> Result<String, String> {
 
 #[tauri::command]
 async fn open_directory(app: AppHandle, path: String) -> Result<(), String> {
-    // 获取资源目录路径
     let resource_dir = app.path()
         .resource_dir()
         .map_err(|e| format!("Failed to get resource dir: {}", e))?;
 
-    // 如果是相对路径，转换为绝对路径
     let abs_path = if path.starts_with("./") || path.starts_with(".\\") {
-        // 去掉 ./ 或 .\
         let relative = path.trim_start_matches("./").trim_start_matches(".\\");
 
-        // 在开发模式下，使用项目根目录
-        // 在生产模式下，使用资源目录的父目录
-        let base_dir = if resource_dir.join("_up_").exists() {
-            // 生产模式：Resources/_up_/
-            resource_dir.parent().unwrap().parent().unwrap().to_path_buf()
+        // 直接使用 cfg!(debug_assertions) 判断开发/生产模式
+        let project_root = if cfg!(debug_assertions) {
+            // 开发模式：resource_dir 是 src-tauri/target/debug，向上3层到项目根目录
+            resource_dir
+                .parent().unwrap()  // src-tauri/target
+                .parent().unwrap()  // src-tauri
+                .parent().unwrap()  // 项目根目录
+                .to_path_buf()
         } else {
-            // 开发模式：项目根目录
-            resource_dir.parent().unwrap().to_path_buf()
+            // 生产模式
+            resource_dir.parent().unwrap().parent().unwrap().to_path_buf()
         };
 
-        base_dir.join(relative)
+        project_root.join(relative)
     } else {
         std::path::PathBuf::from(&path)
     };
@@ -213,7 +301,8 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_dialog::init())
         .manage(WakeScriptState(Arc::new(Mutex::new(None))))
-        .invoke_handler(tauri::generate_handler![greet, run_wake_script, stop_wake_script, select_directory, open_directory])
+        .manage(ParseScriptState(Arc::new(Mutex::new(None))))
+        .invoke_handler(tauri::generate_handler![greet, run_wake_script, stop_wake_script, run_parse_script, stop_parse_script, select_directory, open_directory])
         .setup(|app| {
             // 设置应用激活策略，使其不出现在 Dock
         // macOS: 隐藏 Dock 图标

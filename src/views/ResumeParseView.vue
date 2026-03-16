@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
+import { listen } from '@tauri-apps/api/event'
 import { ElMessage } from 'element-plus'
 
 const autoParseEnabled = ref(true)
@@ -11,7 +12,8 @@ const sites = ref([
     name: 'BOSS直聘',
     logo: new URL('../assets/boss.png', import.meta.url).href,
     timeFilter: 7,
-    downloadDir: './boss_resume',
+    downloadDir: './python-scripts/boss_resume',
+    isRunning: false,
     accounts: [
       { username: '13980987897', lastParseTime: '2025-11-24 17:25:34' },
       { username: '13980987897', lastParseTime: '2025-11-24 17:25:34' }
@@ -22,7 +24,8 @@ const sites = ref([
     name: '猎聘',
     logo: new URL('../assets/liepin.png', import.meta.url).href,
     timeFilter: 7,
-    downloadDir: './liepin_resume',
+    downloadDir: './python-scripts/liepin_resume',
+    isRunning: false,
     accounts: [
       { username: '13980987897', lastParseTime: '2025-11-24 17:25:34' }
     ]
@@ -32,7 +35,8 @@ const sites = ref([
     name: '智联招聘',
     logo: new URL('../assets/zhilian.png', import.meta.url).href,
     timeFilter: 7,
-    downloadDir: './zhilian_resume',
+    downloadDir: './python-scripts/zhilian_resume',
+    isRunning: false,
     accounts: [
       { username: '13980987897', lastParseTime: '2025-11-24 17:25:34' },
       { username: '13980987897', lastParseTime: '2025-11-24 17:25:34' },
@@ -44,18 +48,66 @@ const sites = ref([
     name: '前程无忧',
     logo: new URL('../assets/qcwy.png', import.meta.url).href,
     timeFilter: 7,
-    downloadDir: './qiancheng_resume',
+    downloadDir: './python-scripts/qiancheng_resume',
+    isRunning: false,
     accounts: [
       { username: '13980987897', lastParseTime: '2025-11-24 17:25:34' }
     ]
   }
 ])
 
+let unlisten: any = null
+
+onMounted(async () => {
+  unlisten = await listen('parse_script_finished', (event: any) => {
+    const [siteId, success] = event.payload
+    const site = sites.value.find(s => s.id === siteId)
+    if (site) {
+      site.isRunning = false
+      if (success) {
+        ElMessage.success(`${site.name} 解析完成`)
+      } else {
+        ElMessage.warning(`${site.name} 解析已停止`)
+      }
+    }
+  })
+})
+
+onUnmounted(() => {
+  if (unlisten) {
+    unlisten()
+  }
+})
+
 async function openDirectory(path: string) {
   try {
     await invoke('open_directory', { path })
   } catch (error) {
     ElMessage.error('打开目录失败: ' + String(error))
+  }
+}
+
+async function handleParse(site: any) {
+  site.isRunning = true
+  ElMessage.info(`开始解析 ${site.name}`)
+  try {
+    await invoke('run_parse_script', {
+      siteId: site.id,
+      days: site.timeFilter
+    })
+  } catch (error) {
+    site.isRunning = false
+    ElMessage.error(`${site.name} 解析失败: ${error}`)
+  }
+}
+
+async function handleStop(site: any) {
+  try {
+    await invoke('stop_parse_script')
+    site.isRunning = false
+    ElMessage.info(`已停止 ${site.name} 解析`)
+  } catch (error) {
+    ElMessage.error(`停止失败: ${error}`)
   }
 }
 </script>
@@ -106,7 +158,8 @@ async function openDirectory(path: string) {
           <span class="dir-path" @click="openDirectory(site.downloadDir)">简历目录</span>
         </div>
         <div class="action">
-          <el-button link type="primary">开始</el-button>
+          <el-button v-if="!site.isRunning" link type="primary" @click="handleParse(site)">开始</el-button>
+          <el-button v-else link type="danger" @click="handleStop(site)">停止</el-button>
         </div>
       </div>
     </div>
