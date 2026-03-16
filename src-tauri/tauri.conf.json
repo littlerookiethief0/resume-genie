@@ -48,7 +48,8 @@
       "../python-scripts"
     ],
     "macOS": {
-      "minimumSystemVersion": "10.15"
+      "minimumSystemVersion": "10.15",
+      "infoPlist": "Info.plist"
     },
     "windows": {
       "wix": {
