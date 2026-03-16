@@ -242,20 +242,21 @@ async fn open_directory(app: AppHandle, path: String) -> Result<(), String> {
     let abs_path = if path.starts_with("./") || path.starts_with(".\\") {
         let relative = path.trim_start_matches("./").trim_start_matches(".\\");
 
-        // 直接使用 cfg!(debug_assertions) 判断开发/生产模式
-        let project_root = if cfg!(debug_assertions) {
+        let final_path = if cfg!(debug_assertions) {
             // 开发模式：resource_dir 是 src-tauri/target/debug，向上3层到项目根目录
-            resource_dir
+            let project_root = resource_dir
                 .parent().unwrap()  // src-tauri/target
                 .parent().unwrap()  // src-tauri
                 .parent().unwrap()  // 项目根目录
-                .to_path_buf()
+                .to_path_buf();
+            project_root.join(relative)
         } else {
-            // 生产模式
-            resource_dir.parent().unwrap().parent().unwrap().to_path_buf()
+            // 生产模式：resource_dir 是 /Applications/简历精灵.app/Contents/Resources
+            // Python脚本在 _up_/python-scripts 下
+            resource_dir.join("_up_").join(relative)
         };
 
-        project_root.join(relative)
+        final_path
     } else {
         std::path::PathBuf::from(&path)
     };
