@@ -293,7 +293,7 @@ async function handleStop(site: any) {
 .account-item {
   display: flex;
   align-items: center;
-  gap: 16px;
+  gap: 8px;
   font-size: 13px;
 }
 

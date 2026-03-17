@@ -42,7 +42,7 @@ function handleLogin() {
         登 录
       </el-button>
 
-      <p class="version">当前版本1.0.0</p>
+      <p class="version">当前版本0.2.4</p>
     </div>
   </div>
 </template>
