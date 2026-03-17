@@ -4,10 +4,25 @@ import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { ElMessage } from 'element-plus'
 
+interface Account {
+  username: string
+  lastParseTime: string
+}
+
+interface Site {
+  id: string
+  name: string
+  logo: string
+  timeFilter: number
+  downloadDir: string
+  isRunning: boolean
+  accounts: Account[]
+}
+
 const autoParseEnabled = ref(true)
 const parsedResumes = ref<Array<{ siteId: string; name: string; phone: string }>>([])
 
-const sites = ref([
+const sites = ref<Site[]>([
   {
     id: 'boss',
     name: 'BOSS直聘',
