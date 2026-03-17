@@ -5,6 +5,7 @@ import { listen } from '@tauri-apps/api/event'
 import { ElMessage } from 'element-plus'
 
 const autoParseEnabled = ref(true)
+const parsedResumes = ref<Array<{ siteId: string; name: string; phone: string }>>([])
 
 const sites = ref([
   {
@@ -57,6 +58,7 @@ const sites = ref([
 ])
 
 let unlisten: any = null
+let unlistenData: any = null
 
 onMounted(async () => {
   unlisten = await listen('parse_script_finished', (event: any) => {
@@ -71,11 +73,27 @@ onMounted(async () => {
       }
     }
   })
+
+  unlistenData = await listen('parse_resume_data', (event: any) => {
+    const [siteId, jsonStr] = event.payload
+    try {
+      const data = JSON.parse(jsonStr)
+      parsedResumes.value.unshift({ siteId, name: data.name, phone: data.phone })
+      if (parsedResumes.value.length > 50) {
+        parsedResumes.value = parsedResumes.value.slice(0, 50)
+      }
+    } catch (e) {
+      console.error('Failed to parse resume data:', e)
+    }
+  })
 })
 
 onUnmounted(() => {
   if (unlisten) {
     unlisten()
+  }
+  if (unlistenData) {
+    unlistenData()
   }
 })
 
@@ -122,6 +140,16 @@ async function handleStop(site: any) {
     <div class="auto-switch">
       <span class="switch-label">每次简历唤醒时自动执行解析和保存主投和下载简历</span>
       <el-switch v-model="autoParseEnabled" />
+    </div>
+
+    <div v-if="parsedResumes.length > 0" class="parsed-resumes">
+      <div class="parsed-header">实时解析结果</div>
+      <div class="resume-items">
+        <div v-for="(resume, index) in parsedResumes" :key="index" class="resume-item">
+          <span class="resume-name">{{ resume.name }}</span>
+          <span class="resume-phone">{{ resume.phone }}</span>
+        </div>
+      </div>
     </div>
 
     <div class="site-list">
@@ -202,6 +230,49 @@ async function handleStop(site: any) {
 .switch-label {
   font-size: 14px;
   color: #333;
+}
+
+.parsed-resumes {
+  background: #fff;
+  border-radius: 10px;
+  padding: 16px 24px;
+  margin-bottom: 20px;
+  max-height: 200px;
+  overflow-y: auto;
+  flex-shrink: 0;
+}
+
+.parsed-header {
+  font-size: 14px;
+  font-weight: 600;
+  color: #333;
+  margin-bottom: 12px;
+}
+
+.resume-items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.resume-item {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 8px 12px;
+  background: #f5f5f5;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.resume-name {
+  color: #333;
+  font-weight: 500;
+  min-width: 80px;
+}
+
+.resume-phone {
+  color: #666;
 }
 
 .site-list {

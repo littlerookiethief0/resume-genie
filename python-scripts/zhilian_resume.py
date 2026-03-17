@@ -28,7 +28,7 @@ class ZhilianResumeCrawler:
         self.config: dict[str, Any] = kwargs
         self.stop_event: Optional[threading.Event] = stop_event
         self.on_step = on_step or (lambda step: None)
-        self.on_data = on_data or (lambda data: None)
+        self.on_data = on_data or (lambda data: print(f"RESUME_DATA:{json.dumps(data, ensure_ascii=False)}", flush=True))
         self.browser_manager: PlaywrightBrowserManager = PlaywrightBrowserManager()
         # 自动判断：有浏览器就CDP连接，没有就新启动
         self.context: BrowserContext = self.browser_manager.start()

@@ -1,6 +1,7 @@
 use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::thread;
+use std::io::{BufRead, BufReader};
 use tauri::{AppHandle, Emitter, State, Manager};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{TrayIconBuilder, TrayIconEvent};
@@ -192,7 +193,7 @@ async fn run_parse_script(app: AppHandle, state: State<'_, ParseScriptState>, si
         .arg("--days")
         .arg(days.to_string())
         .current_dir(&script_dir)
-        .stdout(Stdio::inherit())
+        .stdout(Stdio::piped())
         .stderr(Stdio::inherit());
 
     #[cfg(windows)]
@@ -204,6 +205,23 @@ async fn run_parse_script(app: AppHandle, state: State<'_, ParseScriptState>, si
     let pid = child.id();
     let site_id_clone = site_id.clone();
     *state.0.lock().unwrap() = Some((pid, site_id.clone()));
+
+    // 读取stdout并发送事件
+    let stdout = child.stdout.take().unwrap();
+    let app_clone = app.clone();
+    let site_id_for_stdout = site_id.clone();
+    thread::spawn(move || {
+        let reader = BufReader::new(stdout);
+        for line in reader.lines() {
+            if let Ok(line) = line {
+                if line.starts_with("RESUME_DATA:") {
+                    if let Some(json_str) = line.strip_prefix("RESUME_DATA:") {
+                        let _ = app_clone.emit("parse_resume_data", (site_id_for_stdout.clone(), json_str));
+                    }
+                }
+            }
+        }
+    });
 
     let state_inner = Arc::clone(&state.0);
     thread::spawn(move || {
