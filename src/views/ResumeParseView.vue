@@ -15,10 +15,7 @@ const sites = ref([
     timeFilter: 7,
     downloadDir: './python-scripts/boss_resume',
     isRunning: false,
-    accounts: [
-      { username: '13980987897', lastParseTime: '2025-11-24 17:25:34' },
-      { username: '13980987897', lastParseTime: '2025-11-24 17:25:34' }
-    ]
+    accounts: []
   },
   {
     id: 'liepin',
@@ -27,9 +24,7 @@ const sites = ref([
     timeFilter: 7,
     downloadDir: './python-scripts/liepin_resume',
     isRunning: false,
-    accounts: [
-      { username: '13980987897', lastParseTime: '2025-11-24 17:25:34' }
-    ]
+    accounts: []
   },
   {
     id: 'zhilian',
@@ -38,11 +33,7 @@ const sites = ref([
     timeFilter: 7,
     downloadDir: './python-scripts/zhilian_resume',
     isRunning: false,
-    accounts: [
-      { username: '13980987897', lastParseTime: '2025-11-24 17:25:34' },
-      { username: '13980987897', lastParseTime: '2025-11-24 17:25:34' },
-      { username: '13980987897', lastParseTime: '2025-11-24 17:25:34' }
-    ]
+    accounts: []
   },
   {
     id: 'qiancheng',
@@ -51,9 +42,7 @@ const sites = ref([
     timeFilter: 7,
     downloadDir: './python-scripts/qiancheng_resume',
     isRunning: false,
-    accounts: [
-      { username: '13980987897', lastParseTime: '2025-11-24 17:25:34' }
-    ]
+    accounts: []
   }
 ])
 
