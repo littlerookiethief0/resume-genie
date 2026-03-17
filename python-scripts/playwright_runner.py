@@ -33,13 +33,37 @@ class PlaywrightBrowserManager:
             no_viewport=True,
             args=[
                 "--start-maximized",
-                "--remote-debugging-port=9222",
                 "--disable-blink-features=AutomationControlled",
                 "--disable-features=IsolateOrigins,site-per-process",
                 "--disable-site-isolation-trials",
+                "--disable-infobars",
+                "--disable-dev-shm-usage",
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--disable-web-security",
             ],
             ignore_default_args=["--enable-automation"],
         )
+
+        # 注入反检测脚本
+        self.context.add_init_script("""
+            Object.defineProperty(navigator, 'webdriver', {
+                get: () => undefined
+            });
+
+            window.navigator.chrome = {
+                runtime: {}
+            };
+
+            Object.defineProperty(navigator, 'plugins', {
+                get: () => [1, 2, 3, 4, 5]
+            });
+
+            Object.defineProperty(navigator, 'languages', {
+                get: () => ['zh-CN', 'zh', 'en']
+            });
+        """)
+
         return self.context
 
     def close_tabs(self, keyword: str):
