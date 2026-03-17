@@ -5,7 +5,8 @@ import { listen } from '@tauri-apps/api/event'
 import { ElMessage } from 'element-plus'
 
 interface Account {
-  username: string
+  name: string
+  phone: string
   lastParseTime: string
 }
 
@@ -20,7 +21,6 @@ interface Site {
 }
 
 const autoParseEnabled = ref(true)
-const parsedResumes = ref<Array<{ siteId: string; name: string; phone: string }>>([])
 
 const sites = ref<Site[]>([
   {
@@ -82,9 +82,14 @@ onMounted(async () => {
     const [siteId, jsonStr] = event.payload
     try {
       const data = JSON.parse(jsonStr)
-      parsedResumes.value.unshift({ siteId, name: data.name, phone: data.phone })
-      if (parsedResumes.value.length > 50) {
-        parsedResumes.value = parsedResumes.value.slice(0, 50)
+      const site = sites.value.find(s => s.id === siteId)
+      if (site) {
+        const now = new Date()
+        const timeStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')} ${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}:${String(now.getSeconds()).padStart(2, '0')}`
+        site.accounts.unshift({ name: data.name, phone: data.phone, lastParseTime: timeStr })
+        if (site.accounts.length > 20) {
+          site.accounts = site.accounts.slice(0, 20)
+        }
       }
     } catch (e) {
       console.error('Failed to parse resume data:', e)
@@ -146,16 +151,6 @@ async function handleStop(site: any) {
       <el-switch v-model="autoParseEnabled" />
     </div>
 
-    <div v-if="parsedResumes.length > 0" class="parsed-resumes">
-      <div class="parsed-header">实时解析结果</div>
-      <div class="resume-items">
-        <div v-for="(resume, index) in parsedResumes" :key="index" class="resume-item">
-          <span class="resume-name">{{ resume.name }}</span>
-          <span class="resume-phone">{{ resume.phone }}</span>
-        </div>
-      </div>
-    </div>
-
     <div class="site-list">
       <div class="list-header">
         <span>网站</span>
@@ -172,7 +167,8 @@ async function handleStop(site: any) {
         </div>
         <div class="accounts">
           <div v-for="(account, index) in site.accounts" :key="index" class="account-item">
-            <span class="account-username">用户名：{{ account.username }}</span>
+            <span class="account-name">{{ account.name }}</span>
+            <span class="account-phone">{{ account.phone }}</span>
             <span class="account-time">{{ account.lastParseTime }}</span>
           </div>
         </div>
@@ -234,49 +230,6 @@ async function handleStop(site: any) {
 .switch-label {
   font-size: 14px;
   color: #333;
-}
-
-.parsed-resumes {
-  background: #fff;
-  border-radius: 10px;
-  padding: 16px 24px;
-  margin-bottom: 20px;
-  max-height: 200px;
-  overflow-y: auto;
-  flex-shrink: 0;
-}
-
-.parsed-header {
-  font-size: 14px;
-  font-weight: 600;
-  color: #333;
-  margin-bottom: 12px;
-}
-
-.resume-items {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.resume-item {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  padding: 8px 12px;
-  background: #f5f5f5;
-  border-radius: 6px;
-  font-size: 13px;
-}
-
-.resume-name {
-  color: #333;
-  font-weight: 500;
-  min-width: 80px;
-}
-
-.resume-phone {
-  color: #666;
 }
 
 .site-list {
@@ -344,9 +297,17 @@ async function handleStop(site: any) {
   font-size: 13px;
 }
 
-.account-username {
+.account-name {
+  color: #333;
+  font-weight: 500;
+  white-space: nowrap;
+  min-width: 80px;
+}
+
+.account-phone {
   color: #555;
   white-space: nowrap;
+  min-width: 110px;
 }
 
 .account-time {
