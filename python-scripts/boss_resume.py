@@ -91,7 +91,7 @@ class BossCrawler:
         login_response=self.page.request.get("https://www.zhipin.com/wapi/hunter/h5/hunterManage/checkAuth")
         login_data=login_response.json()
         if login_data.get('message') != "Success":
-            self.page.goto("https://www.zhipin.com/web/user/?ka=bticket")
+            self.page.goto("https://www.zhipin.com/web/user/?intent=1&ka=header-boss")
             self.page.locator('//span[text()="升级VIP"]').wait_for(state='visible',timeout=60000)
 
         if self.stopped:
