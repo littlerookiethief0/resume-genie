@@ -85,13 +85,13 @@ class BossCrawler:
         mopin_login_data=mopin_login_response.json()
         if mopin_login_data.get('msg') != "成功":
             self.page.goto("https://mopin.58.com/login")
-            self.page.locator('//span[contains(text(),"做单")]').wait_for(state='visible',timeout=60000)
+            self.page.locator('//span[contains(text(),"做单")]').first.wait_for(state='visible',timeout=60000)
         mopin_cookie = local_utils.get_cookie_string(self.context)
         # 判断boss直聘是否登陆了
         login_response=self.page.request.get("https://www.zhipin.com/wapi/hunter/h5/hunterManage/checkAuth")
         login_data=login_response.json()
         if login_data.get('message') != "Success":
-            self.page.goto("https://www.zhipin.com/web/user/?intent=1&ka=header-boss")
+            self.page.goto("https://www.zhipin.com/sem/10.html?sid=sem_pz_bdpc_dasou_title")
             self.page.locator('//span[text()="升级VIP"]').wait_for(state='visible',timeout=60000)
 
         if self.stopped:

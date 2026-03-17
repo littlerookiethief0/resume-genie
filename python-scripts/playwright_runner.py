@@ -47,22 +47,66 @@ class PlaywrightBrowserManager:
 
         # 注入反检测脚本
         self.context.add_init_script("""
+            // 隐藏 webdriver
             Object.defineProperty(navigator, 'webdriver', {
                 get: () => undefined
             });
 
+            // 删除 CDP 相关属性
+            delete window.cdc_adoQpoasnfa76pfcZLmcfl_Array;
+            delete window.cdc_adoQpoasnfa76pfcZLmcfl_Promise;
+            delete window.cdc_adoQpoasnfa76pfcZLmcfl_Symbol;
+            delete window.cdc_adoQpoasnfa76pfcZLmcfl_Object;
+            delete window.cdc_adoQpoasnfa76pfcZLmcfl_Proxy;
+
+            // 伪装 Chrome 对象
             window.navigator.chrome = {
-                runtime: {}
+                runtime: {},
+                loadTimes: function() {},
+                csi: function() {},
+                app: {}
             };
 
+            // 伪装 plugins
             Object.defineProperty(navigator, 'plugins', {
                 get: () => [1, 2, 3, 4, 5]
             });
 
+            // 伪装 languages
             Object.defineProperty(navigator, 'languages', {
                 get: () => ['zh-CN', 'zh', 'en']
             });
+
+            // 伪装 permissions
+            const originalQuery = window.navigator.permissions.query;
+            window.navigator.permissions.query = (parameters) => (
+                parameters.name === 'notifications' ?
+                    Promise.resolve({ state: Notification.permission }) :
+                    originalQuery(parameters)
+            );
+
+            // 伪装 hardwareConcurrency
+            Object.defineProperty(navigator, 'hardwareConcurrency', {
+                get: () => 8
+            });
+
+            // 伪装 deviceMemory
+            Object.defineProperty(navigator, 'deviceMemory', {
+                get: () => 8
+            });
+
+            // 伪装 platform
+            Object.defineProperty(navigator, 'platform', {
+                get: () => 'MacIntel'
+            });
+
+            // 隐藏 Playwright 相关属性
+            delete window.__playwright;
+            delete window.__pw_manual;
+            delete window.__PW_inspect;
         """)
+
+
 
         return self.context
 
