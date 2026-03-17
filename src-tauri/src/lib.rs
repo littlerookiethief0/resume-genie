@@ -7,9 +7,6 @@ use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{TrayIconBuilder, TrayIconEvent};
 use tauri::image::Image;
 
-#[cfg(target_os = "macos")]
-use tauri::ActivationPolicy;
-
 #[cfg(target_os = "windows")]
 use std::os::windows::process::CommandExt;
 
