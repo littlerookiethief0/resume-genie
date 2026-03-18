@@ -6,6 +6,19 @@ import { version } from '../../package.json'
 
 const router = useRouter()
 const account = ref('')
+
+function handleLogin() {
+  if (!account.value) {
+    ElMessage.error('请输入RCN平台账号')
+    return
+  }
+  if (account.value === 'root') {
+    router.push('/dashboard')
+    return
+  }
+  // 正常账号走正常登录逻辑（后面对接API）
+  ElMessage.error('账号不存在，请检查后重试')
+}
 </script>
 
 <template>
@@ -34,21 +47,6 @@ const account = ref('')
     </div>
   </div>
 </template>
-
-<script lang="ts">
-function handleLogin() {
-  if (!account.value) {
-    ElMessage.error('请输入RCN平台账号')
-    return
-  }
-  if (account.value === 'root') {
-    router.push('/dashboard')
-    return
-  }
-  // 正常账号走正常登录逻辑（后面对接API）
-  ElMessage.error('账号不存在，请检查后重试')
-}
-</script>
 
 <style scoped>
 .login-container {
