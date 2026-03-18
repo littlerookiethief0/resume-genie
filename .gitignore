@@ -18,6 +18,13 @@ dist-ssr
 *.local
 data
 
+# Resume PDFs (download artifacts)
+boss_resume/
+liepin_resume/
+zhilian_resume/
+qiancheng_resume/
+**/*.pdf
+
 # Rust / Cargo
 target
 
