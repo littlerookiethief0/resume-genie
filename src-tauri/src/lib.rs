@@ -200,7 +200,6 @@ async fn run_parse_script(app: AppHandle, state: State<'_, ParseScriptState>, si
         .map_err(|e| format!("Failed to execute script: {}", e))?;
 
     let pid = child.id();
-    let site_id_clone = site_id.clone();
     *state.0.lock().unwrap() = Some((pid, site_id.clone()));
 
     // 读取stdout并发送事件

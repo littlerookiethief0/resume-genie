@@ -10,11 +10,72 @@ permissions:
   contents: write
   packages: write
 
+concurrency:
+  group: build-release-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
 
 jobs:
+  prepare_release:
+    runs-on: ubuntu-latest
+    name: Prepare draft release
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Read app version
+        id: version
+        shell: bash
+        run: |
+          version="$(python3 -c "import json; print(json.load(open('src-tauri/tauri.conf.json', encoding='utf-8'))['version'])")"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Clean existing draft release assets
+        uses: actions/github-script@v7
+        env:
+          RELEASE_TAG: v${{ steps.version.outputs.version }}
+        with:
+          script: |
+            const tag = process.env.RELEASE_TAG;
+            const { owner, repo } = context.repo;
+            const releases = await github.paginate(github.rest.repos.listReleases, {
+              owner,
+              repo,
+              per_page: 100,
+            });
+            const release = releases.find((item) => item.tag_name === tag && item.draft);
+
+            if (!release) {
+              core.info(`No draft release found for ${tag}, nothing to clean.`);
+              return;
+            }
+
+            const assets = await github.paginate(github.rest.repos.listReleaseAssets, {
+              owner,
+              repo,
+              release_id: release.id,
+              per_page: 100,
+            });
+
+            if (assets.length === 0) {
+              core.info(`Draft release ${tag} has no existing assets.`);
+              return;
+            }
+
+            for (const asset of assets) {
+              core.info(`Deleting old asset: ${asset.name}`);
+              await github.rest.repos.deleteReleaseAsset({
+                owner,
+                repo,
+                asset_id: asset.id,
+              });
+            }
+
   build:
+    needs: prepare_release
     strategy:
       fail-fast: false
       matrix:
