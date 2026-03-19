@@ -145,7 +145,7 @@ async fn stop_parse_script(state: State<'_, ParseScriptState>, app: AppHandle) -
 }
 
 #[tauri::command]
-async fn run_parse_script(app: AppHandle, state: State<'_, ParseScriptState>, site_id: String, days: i32) -> Result<String, String> {
+async fn run_parse_script(app: AppHandle, state: State<'_, ParseScriptState>, site_id: String, days: i32, auto_parse: bool) -> Result<String, String> {
     let resource_dir = app.path()
         .resource_dir()
         .map_err(|e| format!("Failed to get resource dir: {}", e))?;
@@ -174,7 +174,7 @@ async fn run_parse_script(app: AppHandle, state: State<'_, ParseScriptState>, si
         (dir, python)
     };
 
-    let script_path = script_dir.join(format!("{}_resume.py", site_id));
+    let script_path = script_dir.join(format!("{}.py", site_id));
 
     if !script_path.exists() {
         return Err(format!("Script not found: {:?}", script_path));
@@ -221,6 +221,10 @@ async fn run_parse_script(app: AppHandle, state: State<'_, ParseScriptState>, si
     });
 
     let state_inner = Arc::clone(&state.0);
+    let app_for_finish = app.clone();
+    let site_id_for_finish = site_id.clone();
+    let script_dir_clone = script_dir.clone();
+    let python_exe_clone = python_exe.clone();
     thread::spawn(move || {
         let status = child.wait();
         state_inner.lock().unwrap().take();
@@ -228,7 +232,48 @@ async fn run_parse_script(app: AppHandle, state: State<'_, ParseScriptState>, si
             Ok(s) => (s.success(), s.code()),
             Err(_) => (false, None),
         };
-        let _ = app.emit("parse_script_finished", (site_id_clone, success, code));
+
+        // 如果唤醒脚本成功且开启自动解析，执行解析脚本
+        if success && auto_parse {
+            let parse_script = script_dir_clone.join(format!("{}_resume.py", site_id_for_finish));
+            if parse_script.exists() {
+                let mut parse_cmd = Command::new(&python_exe_clone);
+                parse_cmd.arg("-u")
+                    .arg(&parse_script)
+                    .arg("--days")
+                    .arg(days.to_string())
+                    .current_dir(&script_dir_clone)
+                    .stdout(Stdio::piped())
+                    .stderr(Stdio::inherit());
+
+                #[cfg(windows)]
+                parse_cmd.creation_flags(0x08000000);
+
+                if let Ok(mut parse_child) = parse_cmd.spawn() {
+                    // 读取解析脚本的stdout
+                    if let Some(stdout) = parse_child.stdout.take() {
+                        let app_clone2 = app_for_finish.clone();
+                        let site_id_clone2 = site_id_for_finish.clone();
+                        thread::spawn(move || {
+                            let reader = BufReader::new(stdout);
+                            for line in reader.lines() {
+                                if let Ok(line) = line {
+                                    if line.starts_with("RESUME_DATA:") {
+                                        if let Some(json_str) = line.strip_prefix("RESUME_DATA:") {
+                                            let _ = app_clone2.emit("parse_resume_data", (site_id_clone2.clone(), json_str));
+                                        }
+                                    }
+                                }
+                            }
+                        });
+                    }
+
+                    let _ = parse_child.wait();
+                }
+            }
+        }
+
+        let _ = app_for_finish.emit("parse_script_finished", (site_id_for_finish, success, code));
     });
 
     Ok("Parse script started".to_string())

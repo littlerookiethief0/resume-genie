@@ -120,7 +120,8 @@ async function handleParse(site: any) {
   try {
     await invoke('run_parse_script', {
       siteId: site.id,
-      days: site.timeFilter
+      days: site.timeFilter,
+      autoParse: autoParseEnabled.value
     })
   } catch (error) {
     site.isRunning = false
