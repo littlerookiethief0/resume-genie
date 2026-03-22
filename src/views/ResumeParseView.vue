@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch } from 'vue'
 import { invoke } from '@tauri-apps/api/core'
 import { listen } from '@tauri-apps/api/event'
 import { ElMessage } from 'element-plus'
+import { loadAutoParseAfterWake, saveAutoParseAfterWake } from '../composables/useAutoParseAfterWake'
 
 interface Account {
   name: string
@@ -20,7 +21,8 @@ interface Site {
   accounts: Account[]
 }
 
-const autoParseEnabled = ref(true)
+const autoParseEnabled = ref(loadAutoParseAfterWake())
+watch(autoParseEnabled, (v) => saveAutoParseAfterWake(v))
 
 const sites = ref<Site[]>([
   {
@@ -120,8 +122,7 @@ async function handleParse(site: any) {
   try {
     await invoke('run_parse_script', {
       siteId: site.id,
-      days: site.timeFilter,
-      autoParse: autoParseEnabled.value
+      days: site.timeFilter
     })
   } catch (error) {
     site.isRunning = false
@@ -148,7 +149,12 @@ async function handleStop(site: any) {
     </p>
 
     <div class="auto-switch">
-      <span class="switch-label">每次简历唤醒时自动执行解析和保存主投和下载简历</span>
+      <div class="switch-text">
+        <span class="switch-label">在「简历唤醒」页完成唤醒后，自动继续执行解析脚本（<code>*_resume.py</code>）</span>
+        <p class="switch-hint">
+          本页点击「开始」<strong>只运行解析脚本</strong>；与唤醒页共用此开关。关闭后唤醒页仅执行 <code>{站点}.py</code>，不会自动执行 <code>*_resume.py</code>。
+        </p>
+      </div>
       <el-switch v-model="autoParseEnabled" />
     </div>
 
@@ -219,8 +225,9 @@ async function handleStop(site: any) {
 
 .auto-switch {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
+  gap: 16px;
   background: #fff;
   border-radius: 10px;
   padding: 16px 24px;
@@ -228,9 +235,29 @@ async function handleStop(site: any) {
   flex-shrink: 0;
 }
 
+.switch-text {
+  flex: 1;
+  min-width: 0;
+}
+
 .switch-label {
   font-size: 14px;
   color: #333;
+  display: block;
+}
+
+.switch-hint {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: #888;
+  line-height: 1.5;
+}
+
+.switch-hint code {
+  font-size: 11px;
+  background: #f5f5f5;
+  padding: 0 4px;
+  border-radius: 4px;
 }
 
 .site-list {
