@@ -1,5 +1,14 @@
 # GitHub Actions 自动打包说明
 
+代码推送到 GitHub 后，**在 GitHub 云端完成打包**，无需本机执行 `pnpm tauri build`。
+
+## 怎么在 GitHub 上打包
+
+1. **把代码推到 `main`**（本地执行 `git push origin main`）。推送成功后会自动跑工作流 **Build and Release**。
+2. 或打开仓库 **Actions** → 选中 **Build and Release** → 右上角 **Run workflow** → **Run workflow**（手动再打一版）。
+3. 等待任务变绿（约 10～40 分钟，视缓存而定）。
+4. 在 **Actions** 里点进本次运行，页面底部 **Artifacts** 可下载 macOS / Windows 产物；同时会创建/更新 **Draft Release**（标签形如 `v0.2.7`），到 **Releases** 里可下载安装包或编辑后发布。
+
 ## 触发方式
 
 1. **自动触发**：推送代码到 `main` 分支时自动构建

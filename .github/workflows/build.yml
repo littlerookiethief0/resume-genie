@@ -153,7 +153,10 @@ jobs:
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # 避免部分环境下 CI 变量导致 tauri-cli 参数异常
+          CI: false
         with:
+          projectPath: src-tauri
           tagName: v__VERSION__
           releaseName: 'Resume Genie v__VERSION__'
           releaseBody: 'See the assets to download this version and install.'
