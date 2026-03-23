@@ -58,14 +58,18 @@ function getStatusColor(status: string) {
   }
 }
 
-let unlisten: (() => void) | undefined
+const activeStep = ref(0)
+
+let unlistenFinished: (() => void) | undefined
+let unlistenStep: (() => void) | undefined
 
 onMounted(async () => {
-  unlisten = await listen<[string, boolean, number | null]>('wake_script_finished', (event) => {
+  unlistenFinished = await listen<[string, boolean, number | null]>('wake_script_finished', (event) => {
     const [siteId, success, code] = event.payload
     const site = getSiteById(siteId)
     if (!site) return
     site.status = 'idle'
+    activeStep.value = 0
     if (code === -1) {
       ElMessage.warning(`${site.name} 已停止唤醒`)
     } else if (success) {
@@ -75,10 +79,16 @@ onMounted(async () => {
       ElMessage.error(`${site.name} 唤醒失败`)
     }
   })
+
+  unlistenStep = await listen<[string, number]>('wake_step', (event) => {
+    const [, step] = event.payload
+    activeStep.value = step
+  })
 })
 
 onUnmounted(() => {
-  unlisten?.()
+  unlistenFinished?.()
+  unlistenStep?.()
 })
 
 async function handleAction(site: any) {
@@ -93,6 +103,7 @@ async function handleAction(site: any) {
   }
 
   site.status = 'running'
+  activeStep.value = 0
   ElMessage.info(`开始唤醒 ${site.name}`)
 
   try {
@@ -122,7 +133,7 @@ async function handleAction(site: any) {
 
     <!-- 步骤说明 -->
     <div class="steps-wrap">
-      <el-steps :active="3" align-center>
+      <el-steps :active="activeStep" align-center>
         <el-step title="登录网站" />
         <el-step title="检测唤醒条件" description="简历搜索条件" />
         <el-step title="开始唤醒" />

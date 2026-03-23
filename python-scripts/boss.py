@@ -26,7 +26,7 @@ class BossCrawler:
         """kwargs 为前端 run_script('boss', { ... }) 传来的参数，可按需使用。"""
         self.config: dict[str, Any] = kwargs
         self.stop_event: Optional[threading.Event] = stop_event
-        self.on_step = on_step or (lambda step: None)
+        self.on_step = on_step or (lambda step: print(f"STEP:{step}", flush=True))
         self.browser_manager: PlaywrightBrowserManager = PlaywrightBrowserManager()
         self.context: BrowserContext = self.browser_manager.start()
         self.browser_manager.close_tabs("zhipin")
@@ -80,11 +80,12 @@ class BossCrawler:
         self.login()
         time.sleep(5)
         self.page.goto("https://www.zhipin.com/web/chat/search")
-
+        self.on_step(2)  
         # 等待第二页加载出来，说明条件筛选完成
         contion_response=local_utils.wait_for_condition(self.page,lambda:self.page_params.get('page')=='2')
         if not contion_response:
             return '设置条件超过6分钟，终止脚本执行'
+        self.on_step(3)  
 
         iframe=self.page.frame_locator('//iframe[@name="searchFrame"]')
         scroll_func=lambda:    iframe.locator('//p[text()="点击加载更多"]').scroll_into_view_if_needed()

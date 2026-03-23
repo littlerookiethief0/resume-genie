@@ -26,7 +26,7 @@ class ZhilianCrawler:
         """kwargs 为前端 run_script('boss', { ... }) 传来的参数，可按需使用。"""
         self.config: dict[str, Any] = kwargs
         self.stop_event: Optional[threading.Event] = stop_event
-        self.on_step = on_step or (lambda step: None)
+        self.on_step = on_step or (lambda step: print(f"STEP:{step}", flush=True))
         self.browser_manager: PlaywrightBrowserManager = PlaywrightBrowserManager()
         self.context: BrowserContext = self.browser_manager.start()
         self.browser_manager.close_tabs("zhaopin")

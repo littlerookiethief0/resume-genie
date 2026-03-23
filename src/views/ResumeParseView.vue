@@ -149,12 +149,7 @@ async function handleStop(site: any) {
     </p>
 
     <div class="auto-switch">
-      <div class="switch-text">
-        <span class="switch-label">在「简历唤醒」页完成唤醒后，自动继续执行解析脚本（<code>*_resume.py</code>）</span>
-        <p class="switch-hint">
-          本页点击「开始」<strong>只运行解析脚本</strong>；与唤醒页共用此开关。关闭后唤醒页仅执行 <code>{站点}.py</code>，不会自动执行 <code>*_resume.py</code>。
-        </p>
-      </div>
+      <span class="switch-label">唤醒后自动解析</span>
       <el-switch v-model="autoParseEnabled" />
     </div>
 
@@ -225,7 +220,7 @@ async function handleStop(site: any) {
 
 .auto-switch {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 16px;
   background: #fff;
@@ -235,29 +230,9 @@ async function handleStop(site: any) {
   flex-shrink: 0;
 }
 
-.switch-text {
-  flex: 1;
-  min-width: 0;
-}
-
 .switch-label {
   font-size: 14px;
   color: #333;
-  display: block;
-}
-
-.switch-hint {
-  margin: 8px 0 0;
-  font-size: 12px;
-  color: #888;
-  line-height: 1.5;
-}
-
-.switch-hint code {
-  font-size: 11px;
-  background: #f5f5f5;
-  padding: 0 4px;
-  border-radius: 4px;
 }
 
 .site-list {

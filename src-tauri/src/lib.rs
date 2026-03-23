@@ -98,7 +98,7 @@ async fn run_wake_script(
     cmd.arg("-u")
         .arg(&script_path)
         .current_dir(&script_dir)
-        .stdout(Stdio::inherit())
+        .stdout(Stdio::piped())
         .stderr(Stdio::inherit());
 
     // Windows: 隐藏控制台窗口
@@ -107,6 +107,27 @@ async fn run_wake_script(
 
     let mut child = cmd.spawn()
         .map_err(|e| format!("Failed to execute script: {}", e))?;
+
+    // 读取唤醒脚本的 stdout，解析 STEP: 前缀并发送事件
+    let stdout = child.stdout.take();
+    let app_stdout = app.clone();
+    let site_id_stdout = site_id.clone();
+    if let Some(stdout) = stdout {
+        thread::spawn(move || {
+            let reader = BufReader::new(stdout);
+            for line in reader.lines() {
+                if let Ok(line) = line {
+                    if let Some(step_str) = line.strip_prefix("STEP:") {
+                        if let Ok(step) = step_str.trim().parse::<i32>() {
+                            let _ = app_stdout.emit("wake_step", (site_id_stdout.clone(), step));
+                        }
+                    } else {
+                        eprintln!("[wake:{}] {}", site_id_stdout, line);
+                    }
+                }
+            }
+        });
+    }
 
     let pid = child.id();
     let site_id_clone = site_id.clone();
