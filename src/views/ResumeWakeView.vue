@@ -11,28 +11,24 @@ const sites = ref([
     name: 'BOSS直聘',
     logo: new URL('../assets/boss.png', import.meta.url).href,
     status: 'idle',
-    timeFilter: 7,
   },
   {
     id: 'liepin',
     name: '猎聘',
     logo: new URL('../assets/liepin.png', import.meta.url).href,
     status: 'idle',
-    timeFilter: 7,
   },
   {
     id: 'zhilian',
     name: '智联招聘',
     logo: new URL('../assets/zhilian.png', import.meta.url).href,
     status: 'idle',
-    timeFilter: 7,
   },
   {
     id: 'qiancheng',
     name: '前程无忧',
     logo: new URL('../assets/qcwy.png', import.meta.url).href,
     status: 'idle',
-    timeFilter: 7,
   }
 ])
 
@@ -102,7 +98,7 @@ async function handleAction(site: any) {
   try {
     await invoke('run_wake_script', {
       siteId: site.id,
-      days: site.timeFilter,
+      days: 7,
       autoParse: loadAutoParseAfterWake(),
     })
   } catch (error) {
@@ -137,7 +133,6 @@ async function handleAction(site: any) {
     <div class="site-list">
       <div class="list-header">
         <span>网站</span>
-        <span>时间过滤</span>
         <span>唤醒状态</span>
         <span class="header-action">操作</span>
       </div>
@@ -146,17 +141,6 @@ async function handleAction(site: any) {
         <div class="site-name">
           <img :src="site.logo" class="site-logo" />
           <span>{{ site.name }}</span>
-        </div>
-        <div class="time-filter">
-          <el-input-number
-            v-model="site.timeFilter"
-            :min="1"
-            :max="365"
-            size="small"
-            controls-position="right"
-            :disabled="site.status === 'running'"
-          />
-          <span style="margin-left: 8px; font-size: 12px; color: #999">天内</span>
         </div>
         <span class="site-status" :style="{ color: getStatusColor(site.status) }">
           {{ getStatusText(site.status) }}
@@ -218,7 +202,7 @@ async function handleAction(site: any) {
 
 .list-header {
   display: grid;
-  grid-template-columns: 1.2fr 1fr 1fr 0.9fr;
+  grid-template-columns: 1fr 1fr 1fr;
   padding: 12px 24px;
   font-size: 13px;
   color: #999;
@@ -231,7 +215,7 @@ async function handleAction(site: any) {
 
 .site-row {
   display: grid;
-  grid-template-columns: 1.2fr 1fr 1fr 0.9fr;
+  grid-template-columns: 1fr 1fr 1fr;
   padding: 16px 24px;
   align-items: center;
   border-bottom: 1px solid #f5f5f5;
@@ -260,11 +244,6 @@ async function handleAction(site: any) {
   height: 32px;
   object-fit: contain;
   border-radius: 6px;
-}
-
-.time-filter {
-  display: flex;
-  align-items: center;
 }
 
 .site-status {
