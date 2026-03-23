@@ -30,7 +30,6 @@ class BossCrawler:
         self.on_step = on_step or (lambda step: None)
         self.on_data = on_data or (lambda data: print(f"RESUME_DATA:{json.dumps(data, ensure_ascii=False)}", flush=True))
         self.browser_manager: PlaywrightBrowserManager = PlaywrightBrowserManager()
-        # 自动判断：有浏览器就CDP连接，没有就新启动
         self.context: BrowserContext = self.browser_manager.start()
         self.browser_manager.close_tabs("zhipin")
         self.page: Page = self.context.new_page()
@@ -81,6 +80,7 @@ class BossCrawler:
             return
 
         # 判断mopin 是否登陆了 是否正常
+        time.sleep(random.uniform(1, 3))
         mopin_login_response=self.page.request.get("https://mopinapi.58.com/account/currentInfo")
         mopin_login_data=mopin_login_response.json()
         if mopin_login_data.get('msg') != "成功":
@@ -88,10 +88,17 @@ class BossCrawler:
             self.page.locator('//span[contains(text(),"做单")]').first.wait_for(state='visible',timeout=60000)
         mopin_cookie = local_utils.get_cookie_string(self.context)
         # 判断boss直聘是否登陆了
+        time.sleep(random.uniform(1, 3))
         login_response=self.page.request.get("https://www.zhipin.com/wapi/hunter/h5/hunterManage/checkAuth")
         login_data=login_response.json()
         if login_data.get('message') != "Success":
-            self.page.goto("https://www.zhipin.com/sem/10.html?sid=sem_pz_bdpc_dasou_title")
+            self.page.goto("https://www.baidu.com/")
+            time.sleep(random.uniform(1, 2))
+            self.page.locator('//div[@id="chat-input-area"]/textarea').fill("boss直聘")
+            self.page.locator('//div[@id="chat-input-area"]/textarea').press("Enter")
+            time.sleep(random.uniform(2, 4))
+            boss_url=self.page.locator('//a[@data-url="www.zhipin.com/"]').get_attribute('href')
+            self.page.goto(boss_url)
             self.page.locator('//span[text()="升级VIP"]').wait_for(state='visible',timeout=60000)
 
         if self.stopped:

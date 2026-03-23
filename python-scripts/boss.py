@@ -28,7 +28,6 @@ class BossCrawler:
         self.stop_event: Optional[threading.Event] = stop_event
         self.on_step = on_step or (lambda step: None)
         self.browser_manager: PlaywrightBrowserManager = PlaywrightBrowserManager()
-        # 自动判断：有浏览器就CDP连接，没有就新启动
         self.context: BrowserContext = self.browser_manager.start()
         self.browser_manager.close_tabs("zhipin")
         self.page: Page = self.context.new_page()
@@ -46,6 +45,7 @@ class BossCrawler:
             self.awaken_list_request(response.json())
 
     def login(self):
+        time.sleep(random.uniform(1, 3))
         login_response=self.page.request.get("https://www.zhipin.com/wapi/hunter/h5/hunterManage/checkAuth")
         login_data=login_response.json()
         if login_data.get('message') != "Success":
@@ -78,7 +78,7 @@ class BossCrawler:
         self.page.on("response", self.monitor_awake_response)
         # 判断是否登陆成功，如果未登陆，则跳转登陆页面
         self.login()
-
+        time.sleep(5)
         self.page.goto("https://www.zhipin.com/web/chat/search")
 
         # 等待第二页加载出来，说明条件筛选完成

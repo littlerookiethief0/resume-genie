@@ -1,11 +1,20 @@
 import re
 import os
+import sys
 from playwright.sync_api import sync_playwright
+from playwright_stealth import Stealth
 
 try:
     from .local_utils import get_data_path
 except ImportError:
     from local_utils import get_data_path
+
+_stealth = Stealth(
+    init_scripts_only=True,
+    navigator_languages_override=("zh-CN", "zh", "en"),
+    navigator_vendor_override="Google Inc.",
+    navigator_platform_override="MacIntel" if sys.platform == "darwin" else "Win32",
+)
 
 
 class PlaywrightBrowserManager:
@@ -31,82 +40,17 @@ class PlaywrightBrowserManager:
             channel="chrome",
             headless=self.headless,
             no_viewport=True,
+            locale="zh-CN",
+            timezone_id="Asia/Shanghai",
             args=[
                 "--start-maximized",
                 "--disable-blink-features=AutomationControlled",
-                "--disable-features=IsolateOrigins,site-per-process",
-                "--disable-site-isolation-trials",
                 "--disable-infobars",
-                "--disable-dev-shm-usage",
-                "--no-sandbox",
-                "--disable-setuid-sandbox",
-                "--disable-web-security",
             ],
             ignore_default_args=["--enable-automation"],
         )
 
-        # 注入反检测脚本
-        self.context.add_init_script("""
-            // 隐藏 webdriver
-            Object.defineProperty(navigator, 'webdriver', {
-                get: () => undefined
-            });
-
-            // 删除 CDP 相关属性
-            delete window.cdc_adoQpoasnfa76pfcZLmcfl_Array;
-            delete window.cdc_adoQpoasnfa76pfcZLmcfl_Promise;
-            delete window.cdc_adoQpoasnfa76pfcZLmcfl_Symbol;
-            delete window.cdc_adoQpoasnfa76pfcZLmcfl_Object;
-            delete window.cdc_adoQpoasnfa76pfcZLmcfl_Proxy;
-
-            // 伪装 Chrome 对象
-            window.navigator.chrome = {
-                runtime: {},
-                loadTimes: function() {},
-                csi: function() {},
-                app: {}
-            };
-
-            // 伪装 plugins
-            Object.defineProperty(navigator, 'plugins', {
-                get: () => [1, 2, 3, 4, 5]
-            });
-
-            // 伪装 languages
-            Object.defineProperty(navigator, 'languages', {
-                get: () => ['zh-CN', 'zh', 'en']
-            });
-
-            // 伪装 permissions
-            const originalQuery = window.navigator.permissions.query;
-            window.navigator.permissions.query = (parameters) => (
-                parameters.name === 'notifications' ?
-                    Promise.resolve({ state: Notification.permission }) :
-                    originalQuery(parameters)
-            );
-
-            // 伪装 hardwareConcurrency
-            Object.defineProperty(navigator, 'hardwareConcurrency', {
-                get: () => 8
-            });
-
-            // 伪装 deviceMemory
-            Object.defineProperty(navigator, 'deviceMemory', {
-                get: () => 8
-            });
-
-            // 伪装 platform
-            Object.defineProperty(navigator, 'platform', {
-                get: () => 'MacIntel'
-            });
-
-            // 隐藏 Playwright 相关属性
-            delete window.__playwright;
-            delete window.__pw_manual;
-            delete window.__PW_inspect;
-        """)
-
-
+        _stealth.apply_stealth_sync(self.context)
 
         return self.context
 

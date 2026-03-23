@@ -43,6 +43,7 @@ class ZhilianCrawler:
             self.awaken_list_request(response.json())
 
     def login(self):
+        time.sleep(random.uniform(1, 3))
         login_response=self.page.request.get("https://rd6.zhaopin.com/api/im/user")
         login_data=login_response.json()
         if login_data.get('code') != 200:

@@ -31,7 +31,6 @@ class ZhilianResumeCrawler:
         self.on_step = on_step or (lambda step: None)
         self.on_data = on_data or (lambda data: print(f"RESUME_DATA:{json.dumps(data, ensure_ascii=False)}", flush=True))
         self.browser_manager: PlaywrightBrowserManager = PlaywrightBrowserManager()
-        # 自动判断：有浏览器就CDP连接，没有就新启动
         self.context: BrowserContext = self.browser_manager.start()
         self.browser_manager.close_tabs("liepin")
         self.page: Page = self.context.new_page()
@@ -88,6 +87,7 @@ class ZhilianResumeCrawler:
             return
 
         # 判断mopin 是否登陆了 是否正常
+        time.sleep(random.uniform(1, 3))
         mopin_login_response=self.page.request.get("https://mopinapi.58.com/account/currentInfo")
         mopin_login_data=mopin_login_response.json()
         if mopin_login_data.get('msg') != "成功":
@@ -95,6 +95,7 @@ class ZhilianResumeCrawler:
             self.page.locator('//span[contains(text(),"做单")]').first.wait_for(state='visible',timeout=60000)
         mopin_cookie = local_utils.get_cookie_string(self.context,urls=["https://lpt.liepin.com/account/info"])
 
+        time.sleep(random.uniform(1, 2))
         self.login()
         if self.stopped:
             return
