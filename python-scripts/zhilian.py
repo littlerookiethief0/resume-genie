@@ -84,7 +84,7 @@ class ZhilianCrawler:
 
         self.on_step(3)  
 
-        scroll_func=lambda:self.page.locator('//i[@class="km-icon sati sati-angle-right"]').click()
+        scroll_func=lambda:self.page.locator('//a[not(@disabled)]//i[@class="km-icon sati sati-angle-right"]').click()
         scroll_flag=local_utils.scroll_load_bottom(scroll_func)
         print(scroll_flag)
 
