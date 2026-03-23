@@ -49,7 +49,12 @@ class BossCrawler:
         login_response=self.page.request.get("https://www.zhipin.com/wapi/hunter/h5/hunterManage/checkAuth")
         login_data=login_response.json()
         if login_data.get('message') != "Success":
-            self.page.goto("https://www.zhipin.com/sem/10.html?sid=sem_pz_bdpc_dasou_title")
+            self.page.goto("https://www.baidu.com/")
+            self.page.locator('//div[@id="chat-input-area"]/textarea').fill("boss直聘")
+            self.page.locator('//div[@id="chat-input-area"]/textarea').press("Enter")
+            time.sleep(2)
+            boss_url=self.page.locator('//a[@data-url="www.zhipin.com/"]').get_attribute('href')
+            self.page.goto(boss_url)
             self.page.locator('//span[text()="升级VIP"]').wait_for(state='visible',timeout=60000)
         self.on_step(1)  # 步骤1: 登录网站
 
