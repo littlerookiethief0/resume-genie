@@ -89,19 +89,7 @@ class BossCrawler:
 
         iframe=self.page.frame_locator('//iframe[@name="searchFrame"]')
         # 缓慢滚动，逐渐滚动到最下边
-        def scroll_func():
-            # 每次向下滚动一定的距离并缓慢等待
-            for _ in range(15):
-                # 每次滚动 800 像素
-                self.page.evaluate("(iframe) => { iframe.contentWindow.scrollBy(0, 800); }", iframe.element_handle())
-                time.sleep(0.5 + random.uniform(0, 0.5))
-            # 尝试点击“加载更多”，以触发动态加载（可选）
-            try:
-                load_more = iframe.locator('//p[text()="点击加载更多"]')
-                if load_more.is_visible(timeout=1000):
-                    load_more.click()
-            except Exception:
-                pass
+        scroll_func=lambda:iframe.locator('//p[text()="点击加载更多"]').click()
         scroll_flag=local_utils.scroll_load_bottom(scroll_func)
         print(scroll_flag)
 
