@@ -128,6 +128,8 @@ jobs:
 
       - name: Download standalone Python (macOS)
         if: matrix.platform == 'macos-latest'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cd python-scripts
           curl -L https://github.com/indygreg/python-build-standalone/releases/download/20241016/cpython-3.12.7+20241016-aarch64-apple-darwin-install_only_stripped.tar.gz -o python.tar.gz
@@ -136,10 +138,12 @@ jobs:
           rm python.tar.gz
           ./python/bin/python3 -m pip install -r requirements.txt
           mkdir -p browsers
-          env PLAYWRIGHT_BROWSERS_PATH="$(pwd)/browsers" ./python/bin/python3 -m camoufox fetch
+          env PLAYWRIGHT_BROWSERS_PATH="$(pwd)/browsers" ./python/bin/python3 -m camoufox fetch || echo "::warning::camoufox fetch failed (rate limit?), app will download browser on first run"
 
       - name: Download standalone Python (Windows)
         if: matrix.platform == 'windows-latest'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           cd python-scripts
           curl -L https://github.com/indygreg/python-build-standalone/releases/download/20241016/cpython-3.12.7+20241016-x86_64-pc-windows-msvc-shared-install_only_stripped.tar.gz -o python.tar.gz
@@ -148,7 +152,8 @@ jobs:
           del python.tar.gz
           python\python.exe -m pip install -r requirements.txt
           mkdir browsers
-          set PLAYWRIGHT_BROWSERS_PATH=%CD%\browsers && python\python.exe -m camoufox fetch
+          set PLAYWRIGHT_BROWSERS_PATH=%CD%\browsers
+          python\python.exe -m camoufox fetch || echo "::warning::camoufox fetch failed (rate limit?), app will download browser on first run"
 
       - name: Install frontend dependencies
         run: pnpm install
