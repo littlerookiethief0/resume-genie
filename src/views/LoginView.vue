@@ -2,22 +2,42 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
+import { invoke } from '@tauri-apps/api/core'
 import { version } from '../../package.json'
 
 const router = useRouter()
 const account = ref('')
+const loggingIn = ref(false)
+const MOBILE_RE = /^1\d{10}$/
 
-function handleLogin() {
-  if (!account.value) {
-    ElMessage.error('请输入RCN平台账号')
+async function handleLogin() {
+  const input = account.value.trim()
+  if (!input) {
+    ElMessage.error('请输入手机号')
     return
   }
-  if (account.value === 'root') {
-    router.push('/dashboard')
+  if (!MOBILE_RE.test(input)) {
+    ElMessage.error('请输入11位手机号')
     return
   }
-  // 正常账号走正常登录逻辑（后面对接API）
-  ElMessage.error('账号不存在，请检查后重试')
+  if (loggingIn.value) return
+  loggingIn.value = true
+  try {
+    const resp = await invoke<{ code: number; msg: string; data: number }>(
+      'verify_mobile_account',
+      { mobile: input }
+    )
+    console.log('verify response:', resp)
+    if (resp?.data === 1) {
+      router.push('/dashboard')
+      return
+    }
+    ElMessage.error('无效账号，请检查后重试')
+  } catch (error) {
+    ElMessage.error('登录校验失败，请稍后重试')
+  } finally {
+    loggingIn.value = false
+  }
 }
 </script>
 
@@ -29,7 +49,7 @@ function handleLogin() {
 
       <el-input
         v-model="account"
-        placeholder="请输入RCN平台账号"
+        placeholder="请输入11位手机号"
         size="large"
         @keyup.enter="handleLogin"
       />
@@ -38,6 +58,7 @@ function handleLogin() {
         type="primary"
         size="large"
         class="login-btn"
+        :loading="loggingIn"
         @click="handleLogin"
       >
         登 录

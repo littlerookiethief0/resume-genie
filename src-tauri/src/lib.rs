@@ -2,6 +2,7 @@ use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::io::{BufRead, BufReader};
+use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter, State, Manager};
 use tauri::menu::{Menu, MenuItem};
 use tauri::tray::{TrayIconBuilder, TrayIconEvent};
@@ -22,6 +23,36 @@ fn greet(name: &str) -> String {
     format!("Hello, {}! You've been greeted from Rust!", name)
 }
 
+#[tauri::command]
+async fn verify_mobile_account(mobile: String) -> Result<Value, String> {
+    let mobile = mobile.trim().to_string();
+    let is_valid_mobile = mobile.len() == 11
+        && mobile.starts_with('1')
+        && mobile.chars().all(|c| c.is_ascii_digit());
+    if !is_valid_mobile {
+        return Ok(json!({"code": -1, "msg": "手机号格式错误", "data": 0}));
+    }
+
+    let client = reqwest::Client::new();
+    let resp = client
+        .post("http://mopinleads.58.com/account/verify")
+        .json(&json!({ "mobile": mobile }))
+        .send()
+        .await
+        .map_err(|e| format!("请求失败: {}", e))?;
+
+    let status = resp.status();
+    let body = resp
+        .json::<Value>()
+        .await
+        .map_err(|e| format!("响应解析失败: {}", e))?;
+
+    if !status.is_success() {
+        return Err(format!("接口返回异常状态: {}", status));
+    }
+    Ok(body)
+}
+
 fn kill_process_by_pid(pid: u32) {
     #[cfg(unix)]
     {
@@ -35,6 +66,17 @@ fn kill_process_by_pid(pid: u32) {
         let _ = Command::new("cmd")
             .args(["/C", "taskkill", "/F", "/PID", &pid.to_string()])
             .output();
+    }
+}
+
+fn stop_all_running_scripts(app: &AppHandle) {
+    if let Some((pid, site_id)) = app.state::<WakeScriptState>().0.lock().unwrap().take() {
+        kill_process_by_pid(pid);
+        let _ = app.emit("wake_script_finished", (site_id, false, Some(-1i32)));
+    }
+    if let Some((pid, site_id)) = app.state::<ParseScriptState>().0.lock().unwrap().take() {
+        kill_process_by_pid(pid);
+        let _ = app.emit("parse_script_finished", (site_id, false, Some(-1i32)));
     }
 }
 
@@ -419,7 +461,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(WakeScriptState(Arc::new(Mutex::new(None))))
         .manage(ParseScriptState(Arc::new(Mutex::new(None))))
-        .invoke_handler(tauri::generate_handler![greet, run_wake_script, stop_wake_script, run_parse_script, stop_parse_script, select_directory, open_directory])
+        .invoke_handler(tauri::generate_handler![greet, verify_mobile_account, run_wake_script, stop_wake_script, run_parse_script, stop_parse_script, select_directory, open_directory])
         .setup(|app| {
             // 设置应用激活策略，使其不出现在 Dock
         // macOS: 隐藏 Dock 图标
@@ -449,6 +491,7 @@ pub fn run() {
                             }
                         }
                         "quit" => {
+                            stop_all_running_scripts(&app);
                             app.exit(0);
                         }
                         _ => {}
