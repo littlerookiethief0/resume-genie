@@ -1,6 +1,7 @@
 import re
 import os
 import platform
+import subprocess
 from camoufox.sync_api import Camoufox
 
 try:
@@ -9,10 +10,41 @@ except ImportError:
     from local_utils import get_data_path
 
 
+def _detect_screen_size():
+    """检测屏幕逻辑分辨率，失败时返回平台安全默认值。"""
+    system = platform.system()
+    try:
+        if system == "Darwin":
+            out = subprocess.check_output(
+                [
+                    "python3", "-c",
+                    "import Quartz;"
+                    "b=Quartz.CGDisplayBounds(Quartz.CGMainDisplayID());"
+                    "print(int(b.size.width),int(b.size.height))",
+                ],
+                timeout=5,
+                stderr=subprocess.DEVNULL,
+            ).decode().strip()
+            w, h = out.split()
+            return int(w), int(h)
+        if system == "Windows":
+            import ctypes
+            user32 = ctypes.windll.user32
+            user32.SetProcessDPIAware()
+            return user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)
+    except Exception:
+        pass
+    if system == "Darwin":
+        return 1440, 900
+    if system == "Windows":
+        return 1920, 1080
+    return 1366, 768
+
+
 class _FirefoxContextWrapper:
     """
     包装 Firefox 持久化 context：new_page() 优先复用已有页面，避免多窗口。
-    Firefox 中 new_page() 会开新窗口而非新标签。配合 viewport=None 使用实际窗口尺寸，显示与正常浏览器一致。
+    Firefox 中 new_page() 会开新窗口而非新标签。
     """
 
     def __init__(self, context):
@@ -20,8 +52,17 @@ class _FirefoxContextWrapper:
 
     def new_page(self):
         if self._context.pages:
-            return self._context.pages[0]
-        return self._context.new_page()
+            page = self._context.pages[0]
+        else:
+            page = self._context.new_page()
+        try:
+            page.evaluate(
+                "window.moveTo(0,0);"
+                "window.resizeTo(screen.availWidth, screen.availHeight);"
+            )
+        except Exception:
+            pass
+        return page
 
     def __getattr__(self, name):
         return getattr(self._context, name)
@@ -61,7 +102,7 @@ class PlaywrightBrowserManager:
             locale="zh-CN,zh,en-US",
             user_agent=self.user_agent,
             viewport=None,
-            window=(1920, 1080),
+            window=_detect_screen_size(),
             color_scheme="light",
             fonts=[
                 "PingFang SC",
