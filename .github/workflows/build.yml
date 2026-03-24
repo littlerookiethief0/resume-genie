@@ -175,12 +175,28 @@ jobs:
           prerelease: false
           args: --target ${{ matrix.target }} ${{ matrix.bundle-args }}
 
+      - name: Build DMG manually (macOS)
+        if: matrix.platform == 'macos-latest'
+        shell: bash
+        run: |
+          APP_PATH="src-tauri/target/aarch64-apple-darwin/release/bundle/macos/简历精灵.app"
+          DMG_DIR="src-tauri/target/aarch64-apple-darwin/release/bundle/dmg"
+          VERSION="$(python3 -c "import json;print(json.load(open('src-tauri/tauri.conf.json', encoding='utf-8'))['version'])")"
+          DMG_PATH="$DMG_DIR/简历精灵_${VERSION}_aarch64.dmg"
+          mkdir -p "$DMG_DIR"
+          if [ ! -d "$APP_PATH" ]; then
+            echo "App not found: $APP_PATH"
+            exit 1
+          fi
+          hdiutil create -volname "简历精灵" -srcfolder "$APP_PATH" -ov -format UDZO "$DMG_PATH"
+
       - name: Upload artifacts (macOS)
         if: matrix.platform == 'macos-latest'
         uses: actions/upload-artifact@v4
         with:
           name: resume-genie-macos-aarch64
           path: |
+            src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
             src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app.tar.gz
           if-no-files-found: error
 
