@@ -183,12 +183,18 @@ jobs:
           DMG_DIR="src-tauri/target/aarch64-apple-darwin/release/bundle/dmg"
           VERSION="$(python3 -c "import json;print(json.load(open('src-tauri/tauri.conf.json', encoding='utf-8'))['version'])")"
           DMG_PATH="$DMG_DIR/简历精灵_${VERSION}_aarch64.dmg"
+          STAGE_DIR="$(mktemp -d)/dmg-root"
           mkdir -p "$DMG_DIR"
           if [ ! -d "$APP_PATH" ]; then
             echo "App not found: $APP_PATH"
             exit 1
           fi
-          hdiutil create -volname "简历精灵" -srcfolder "$APP_PATH" -ov -format UDZO "$DMG_PATH"
+          mkdir -p "$STAGE_DIR"
+          cp -R "$APP_PATH" "$STAGE_DIR/"
+          ln -s /Applications "$STAGE_DIR/Applications"
+          # 采用标准 HFS+ 镜像格式，并在产出后校验，避免“磁盘映像已损坏”
+          hdiutil create -fs HFS+ -volname "简历精灵" -srcfolder "$STAGE_DIR" -ov -format UDZO "$DMG_PATH"
+          hdiutil verify "$DMG_PATH"
 
       - name: Upload artifacts (macOS)
         if: matrix.platform == 'macos-latest'
