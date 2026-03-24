@@ -60,7 +60,8 @@ class PlaywrightBrowserManager:
             os=_platform_os,
             locale="zh-CN,zh,en-US",
             user_agent=self.user_agent,
-            viewport=None,  # 使用实际窗口尺寸，与正常打开浏览器一致
+            viewport=None,
+            window=(1920, 1080),
             color_scheme="light",
             fonts=[
                 "PingFang SC",
