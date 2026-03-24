@@ -1,56 +1,84 @@
 import re
 import os
-import sys
-from playwright.sync_api import sync_playwright
-from playwright_stealth import Stealth
+from camoufox.sync_api import Camoufox
 
 try:
     from .local_utils import get_data_path
 except ImportError:
     from local_utils import get_data_path
 
-_stealth = Stealth(
-    init_scripts_only=True,
-    navigator_languages_override=("zh-CN", "zh", "en"),
-    navigator_vendor_override="Google Inc.",
-    navigator_platform_override="MacIntel" if sys.platform == "darwin" else "Win32",
-)
+
+class _FirefoxContextWrapper:
+    """
+    包装 Firefox 持久化 context：new_page() 优先复用已有页面，避免多窗口。
+    Firefox 中 new_page() 会开新窗口而非新标签。配合 viewport=None 使用实际窗口尺寸，显示与正常浏览器一致。
+    """
+
+    def __init__(self, context):
+        self._context = context
+
+    def new_page(self):
+        if self._context.pages:
+            return self._context.pages[0]
+        return self._context.new_page()
+
+    def __getattr__(self, name):
+        return getattr(self._context, name)
 
 
 class PlaywrightBrowserManager:
     """
-    使用用户本机 Chrome 的持久化 context，减少打包体积。
+    使用 Camoufox(Firefox) 持久化 context。
     支持 with 用法和 start/close_tabs/disconnect 用法。
     """
 
     def __init__(self, user_data_dir=None, headless=False):
-        self.user_data_dir = user_data_dir or get_data_path("chrome_profile")
+        self.user_data_dir = user_data_dir or get_data_path("camoufox_profile")
         self.headless = headless
-        self._playwright = None
+        self._camoufox = None
         self.context = None
+        # 固定 UA，避免每次启动 UA 变化；可用环境变量覆盖
+        self.user_agent = os.environ.get(
+            "RESUME_GENIE_USER_AGENT",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:133.0) Gecko/20100101 Firefox/133.0",
+        )
 
     def start(self):
-        """启动 Chrome 持久化 context，返回 context。已启动时直接返回当前 context。"""
+        """启动 Camoufox 持久化 context，返回 context。已启动时直接返回当前 context。"""
         if self.context is not None:
             return self.context
         os.makedirs(self.user_data_dir, exist_ok=True)
-        self._playwright = sync_playwright().start()
-        self.context = self._playwright.chromium.launch_persistent_context(
+        launch_kw = dict(
+            persistent_context=True,
             user_data_dir=self.user_data_dir,
-            channel="chrome",
             headless=self.headless,
-            no_viewport=True,
-            locale="zh-CN",
-            timezone_id="Asia/Shanghai",
-            args=[
-                "--start-maximized",
-                "--disable-blink-features=AutomationControlled",
-                "--disable-infobars",
+            os="macos",
+            locale="zh-CN,zh,en-US",
+            user_agent=self.user_agent,
+            viewport=None,  # 使用实际窗口尺寸，与正常打开浏览器一致
+            color_scheme="light",
+            fonts=[
+                "PingFang SC",
+                "Hiragino Sans GB",
+                "Helvetica Neue",
+                "Arial",
             ],
-            ignore_default_args=["--enable-automation"],
+            config={
+                # 固定字体度量随机种子，减少中文站点字体抖动/乱码
+                "fonts:spacing_seed": 0,
+                # 关闭深色主题，使用标准 Firefox 浅色 UI
+                "disableTheming": True,
+            },
         )
+        # 可选：通过环境变量指定系统 Firefox 可执行文件
+        # 例如 macOS: /Applications/Firefox.app/Contents/MacOS/firefox
+        firefox_path = os.environ.get("RESUME_GENIE_FIREFOX_PATH")
+        if firefox_path and os.path.isfile(firefox_path):
+            launch_kw["executable_path"] = firefox_path
 
-        _stealth.apply_stealth_sync(self.context)
+        self._camoufox = Camoufox(**launch_kw)
+        raw_context = self._camoufox.__enter__()
+        self.context = _FirefoxContextWrapper(raw_context)
 
         return self.context
 
@@ -73,12 +101,12 @@ class PlaywrightBrowserManager:
             except Exception:
                 pass
             self.context = None
-        if self._playwright:
+        if self._camoufox:
             try:
-                self._playwright.stop()
+                self._camoufox.__exit__(None, None, None)
             except Exception:
                 pass
-            self._playwright = None
+            self._camoufox = None
 
     def __enter__(self):
         self.start()

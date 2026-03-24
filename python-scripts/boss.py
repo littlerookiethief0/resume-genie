@@ -89,7 +89,7 @@ class BossCrawler:
 
         iframe=self.page.frame_locator('//iframe[@name="searchFrame"]')
         # 缓慢滚动，逐渐滚动到最下边
-        scroll_func=lambda:iframe.locator('//p[text()="点击加载更多"]').click()
+        scroll_func=lambda:iframe.locator('//p[text()="点击加载更多"]').scroll_into_view_if_needed()
         scroll_flag=local_utils.scroll_load_bottom(scroll_func)
         print(scroll_flag)
 
