@@ -1,5 +1,6 @@
 import re
 import os
+import platform
 from camoufox.sync_api import Camoufox
 
 try:
@@ -48,11 +49,15 @@ class PlaywrightBrowserManager:
         if self.context is not None:
             return self.context
         os.makedirs(self.user_data_dir, exist_ok=True)
+        # 根据当前系统选择 fingerprint 的 os，兼容 Mac/Windows 双平台打包
+        _platform_os = {"Darwin": "macos", "Windows": "windows", "Linux": "linux"}.get(
+            platform.system(), "macos"
+        )
         launch_kw = dict(
             persistent_context=True,
             user_data_dir=self.user_data_dir,
             headless=self.headless,
-            os="macos",
+            os=_platform_os,
             locale="zh-CN,zh,en-US",
             user_agent=self.user_agent,
             viewport=None,  # 使用实际窗口尺寸，与正常打开浏览器一致

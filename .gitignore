@@ -18,6 +18,9 @@ dist-ssr
 *.local
 data
 
+# Camoufox 浏览器（构建时下载，打包进应用）
+python-scripts/browsers/
+
 # Resume PDFs (download artifacts)
 boss_resume/
 liepin_resume/

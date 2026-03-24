@@ -94,12 +94,14 @@ async fn run_wake_script(
         return Err(format!("Python not found: {:?}", python_exe));
     }
 
+    let browsers_path = script_dir.join("browsers");
     let mut cmd = Command::new(&python_exe);
     cmd.arg("-u")
         .arg(&script_path)
         .current_dir(&script_dir)
         .stdout(Stdio::piped())
-        .stderr(Stdio::inherit());
+        .stderr(Stdio::inherit())
+        .env("PLAYWRIGHT_BROWSERS_PATH", &browsers_path);
 
     // Windows: 隐藏控制台窗口
     #[cfg(windows)]
@@ -153,6 +155,7 @@ async fn run_wake_script(
         if auto_parse {
             let parse_script = script_dir_chain.join(format!("{}_resume.py", site_id_clone));
             if parse_script.exists() {
+                let parse_browsers_path = script_dir_chain.join("browsers");
                 let mut parse_cmd = Command::new(&python_exe_chain);
                 parse_cmd
                     .arg("-u")
@@ -161,7 +164,8 @@ async fn run_wake_script(
                     .arg(days.to_string())
                     .current_dir(&script_dir_chain)
                     .stdout(Stdio::piped())
-                    .stderr(Stdio::inherit());
+                    .stderr(Stdio::inherit())
+                    .env("PLAYWRIGHT_BROWSERS_PATH", &parse_browsers_path);
 
                 #[cfg(windows)]
                 parse_cmd.creation_flags(0x08000000);
@@ -277,6 +281,7 @@ async fn run_parse_script(
         return Err(format!("Python not found: {:?}", python_exe));
     }
 
+    let browsers_path = script_dir.join("browsers");
     let mut cmd = Command::new(&python_exe);
     cmd.arg("-u")
         .arg(&script_path)
@@ -284,7 +289,8 @@ async fn run_parse_script(
         .arg(days.to_string())
         .current_dir(&script_dir)
         .stdout(Stdio::piped())
-        .stderr(Stdio::inherit());
+        .stderr(Stdio::inherit())
+        .env("PLAYWRIGHT_BROWSERS_PATH", &browsers_path);
 
     #[cfg(windows)]
     cmd.creation_flags(0x08000000);

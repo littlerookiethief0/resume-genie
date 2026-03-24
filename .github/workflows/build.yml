@@ -135,6 +135,8 @@ jobs:
           tar -xzf python.tar.gz -C python --strip-components=1
           rm python.tar.gz
           ./python/bin/python3 -m pip install -r requirements.txt
+          mkdir -p browsers
+          env PLAYWRIGHT_BROWSERS_PATH="$(pwd)/browsers" ./python/bin/python3 -m camoufox fetch
 
       - name: Download standalone Python (Windows)
         if: matrix.platform == 'windows-latest'
@@ -145,6 +147,8 @@ jobs:
           tar -xzf python.tar.gz -C python --strip-components=1
           del python.tar.gz
           python\python.exe -m pip install -r requirements.txt
+          mkdir browsers
+          set PLAYWRIGHT_BROWSERS_PATH=%CD%\browsers && python\python.exe -m camoufox fetch
 
       - name: Install frontend dependencies
         run: pnpm install
