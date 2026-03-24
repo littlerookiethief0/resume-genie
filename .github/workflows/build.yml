@@ -84,10 +84,12 @@ jobs:
             target: aarch64-apple-darwin
             name: macOS (Apple Silicon)
             python-setup: bash scripts/prepare-python.sh
+            bundle-args: --bundles app
           - platform: windows-latest
             target: x86_64-pc-windows-msvc
             name: Windows (x64)
             python-setup: scripts\prepare-python.bat
+            bundle-args:
 
     runs-on: ${{ matrix.platform }}
     name: Build ${{ matrix.name }}
@@ -171,7 +173,7 @@ jobs:
           releaseBody: 'See the assets to download this version and install.'
           releaseDraft: true
           prerelease: false
-          args: --target ${{ matrix.target }}
+          args: --target ${{ matrix.target }} ${{ matrix.bundle-args }}
 
       - name: Upload artifacts (macOS)
         if: matrix.platform == 'macos-latest'
@@ -179,7 +181,6 @@ jobs:
         with:
           name: resume-genie-macos-aarch64
           path: |
-            src-tauri/target/aarch64-apple-darwin/release/bundle/dmg/*.dmg
             src-tauri/target/aarch64-apple-darwin/release/bundle/macos/*.app.tar.gz
           if-no-files-found: error
 
