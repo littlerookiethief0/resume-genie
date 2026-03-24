@@ -43,7 +43,6 @@ class LiepinCrawler:
             self.awaken_list_request(response.json())
 
     def login(self):
-        time.sleep(random.uniform(1, 3))
         goto_func = lambda: self.page.goto('https://lpt.liepin.com/account/info')
         login_response = PlaywrightBrowserManager.action_and_capture(self.page, goto_func, 'user-privilege')
         if not login_response:
@@ -56,8 +55,6 @@ class LiepinCrawler:
         person_list=response['data']['cvSearchResultForm']['cvSearchListFormList']
         for person in person_list:
             try:
-                # 随机延时，模拟人工操作间隔
-                time.sleep(random.uniform(1.5, 4))
                 parse_data=parse_request.liepin_parse_request(person)['data']
                 mopin_data=mopin_request.awaken_request(parse_data)
                 wake_resume_dict = json.loads(mopin_data['data']['wakeResume'])
