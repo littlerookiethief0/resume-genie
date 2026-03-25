@@ -10,13 +10,11 @@ from urllib.parse import urlparse, parse_qs
 
 def get_data_path(*names):
     """
-    返回项目数据目录下的路径，用于 Chrome 用户数据等。
-    当从 UI（Tauri）或命令行运行时，均使用项目根目录下的 data 目录。
+    返回应用数据目录下的路径，用于浏览器 profile 等持久化数据。
+    优先使用 ~/.resume-genie/data，保证在所有平台（含 Windows MSI 安装到
+    Program Files 的场景）下都可写，且应用升级后数据不丢失。
     """
-    # __file__ 在 python-scripts/ 下，上一级为项目根
-    _script_dir = os.path.dirname(os.path.abspath(__file__))
-    _project_root = os.path.dirname(_script_dir)
-    _data_dir = os.path.join(_project_root, "data")
+    _data_dir = os.path.join(os.path.expanduser("~"), ".resume-genie", "data")
     path = os.path.join(_data_dir, *names)
     return path
 

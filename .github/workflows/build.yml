@@ -151,10 +151,10 @@ jobs:
           curl -L https://github.com/indygreg/python-build-standalone/releases/download/20241016/cpython-3.12.7+20241016-x86_64-pc-windows-msvc-shared-install_only_stripped.tar.gz -o python.tar.gz
           mkdir python
           tar -xzf python.tar.gz -C python --strip-components=1
-          del python.tar.gz
+          Remove-Item python.tar.gz
           python\python.exe -m pip install -r requirements.txt
           mkdir browsers
-          set PLAYWRIGHT_BROWSERS_PATH=%CD%\browsers
+          $env:PLAYWRIGHT_BROWSERS_PATH = "$PWD\browsers"
           python\python.exe -m camoufox fetch || echo "::warning::camoufox fetch failed (rate limit?), app will download browser on first run"
 
       - name: Install frontend dependencies

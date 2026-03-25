@@ -78,6 +78,18 @@ async fn check_version(current_version: String) -> Result<Value, String> {
     Ok(body)
 }
 
+fn spawn_stderr_reader(stderr: std::process::ChildStderr, app: AppHandle, label: String) {
+    thread::spawn(move || {
+        let reader = BufReader::new(stderr);
+        for line in reader.lines() {
+            if let Ok(line) = line {
+                eprintln!("[{}] {}", label, line);
+                let _ = app.emit("script_stderr", (&label, &line));
+            }
+        }
+    });
+}
+
 fn kill_process_by_pid(pid: u32) {
     #[cfg(unix)]
     {
@@ -167,7 +179,7 @@ async fn run_wake_script(
         .arg(&script_path)
         .current_dir(&script_dir)
         .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
+        .stderr(Stdio::piped())
         .env("PLAYWRIGHT_BROWSERS_PATH", &browsers_path);
 
     // Windows: 隐藏控制台窗口
@@ -176,6 +188,10 @@ async fn run_wake_script(
 
     let mut child = cmd.spawn()
         .map_err(|e| format!("Failed to execute script: {}", e))?;
+
+    if let Some(stderr) = child.stderr.take() {
+        spawn_stderr_reader(stderr, app.clone(), format!("wake:{}", site_id));
+    }
 
     // 读取唤醒脚本的 stdout，解析 STEP: 前缀并发送事件
     let stdout = child.stdout.take();
@@ -231,13 +247,16 @@ async fn run_wake_script(
                     .arg(days.to_string())
                     .current_dir(&script_dir_chain)
                     .stdout(Stdio::piped())
-                    .stderr(Stdio::inherit())
+                    .stderr(Stdio::piped())
                     .env("PLAYWRIGHT_BROWSERS_PATH", &parse_browsers_path);
 
                 #[cfg(windows)]
                 parse_cmd.creation_flags(0x08000000);
 
                 if let Ok(mut parse_child) = parse_cmd.spawn() {
+                    if let Some(stderr) = parse_child.stderr.take() {
+                        spawn_stderr_reader(stderr, app_chain.clone(), format!("parse:{}", site_id_clone));
+                    }
                     if let Some(stdout) = parse_child.stdout.take() {
                         let app_parse = app_chain.clone();
                         let site_parse = site_id_clone.clone();
@@ -356,7 +375,7 @@ async fn run_parse_script(
         .arg(days.to_string())
         .current_dir(&script_dir)
         .stdout(Stdio::piped())
-        .stderr(Stdio::inherit())
+        .stderr(Stdio::piped())
         .env("PLAYWRIGHT_BROWSERS_PATH", &browsers_path);
 
     #[cfg(windows)]
@@ -364,6 +383,10 @@ async fn run_parse_script(
 
     let mut child = cmd.spawn()
         .map_err(|e| format!("Failed to execute script: {}", e))?;
+
+    if let Some(stderr) = child.stderr.take() {
+        spawn_stderr_reader(stderr, app.clone(), format!("parse:{}", site_id));
+    }
 
     let pid = child.id();
     *state.0.lock().unwrap() = Some((pid, site_id.clone()));

@@ -79,11 +79,11 @@ class PlaywrightBrowserManager:
         self.headless = headless
         self._camoufox = None
         self.context = None
-        # 固定 UA，避免每次启动 UA 变化；可用环境变量覆盖
-        self.user_agent = os.environ.get(
-            "RESUME_GENIE_USER_AGENT",
-            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:133.0) Gecko/20100101 Firefox/133.0",
-        )
+        _default_ua = {
+            "Darwin": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:133.0) Gecko/20100101 Firefox/133.0",
+            "Windows": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:133.0) Gecko/20100101 Firefox/133.0",
+        }.get(platform.system(), "Mozilla/5.0 (X11; Linux x86_64; rv:133.0) Gecko/20100101 Firefox/133.0")
+        self.user_agent = os.environ.get("RESUME_GENIE_USER_AGENT", _default_ua)
 
     def start(self):
         """启动 Camoufox 持久化 context，返回 context。已启动时直接返回当前 context。"""
