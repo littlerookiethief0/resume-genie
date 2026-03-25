@@ -53,6 +53,31 @@ async fn verify_mobile_account(mobile: String) -> Result<Value, String> {
     Ok(body)
 }
 
+#[tauri::command]
+async fn check_version(current_version: String) -> Result<Value, String> {
+    let client = reqwest::Client::new();
+    let url = format!(
+        "https://jobdig.100dp.com/api/version/check?currentVersion={}",
+        current_version
+    );
+    let resp = client
+        .get(&url)
+        .send()
+        .await
+        .map_err(|e| format!("请求失败: {}", e))?;
+
+    let status = resp.status();
+    let body = resp
+        .json::<Value>()
+        .await
+        .map_err(|e| format!("响应解析失败: {}", e))?;
+
+    if !status.is_success() {
+        return Err(format!("接口返回异常状态: {}", status));
+    }
+    Ok(body)
+}
+
 fn kill_process_by_pid(pid: u32) {
     #[cfg(unix)]
     {
@@ -461,7 +486,7 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .manage(WakeScriptState(Arc::new(Mutex::new(None))))
         .manage(ParseScriptState(Arc::new(Mutex::new(None))))
-        .invoke_handler(tauri::generate_handler![greet, verify_mobile_account, run_wake_script, stop_wake_script, run_parse_script, stop_parse_script, select_directory, open_directory])
+        .invoke_handler(tauri::generate_handler![greet, verify_mobile_account, check_version, run_wake_script, stop_wake_script, run_parse_script, stop_parse_script, select_directory, open_directory])
         .setup(|app| {
             // 设置应用激活策略，使其不出现在 Dock
         // macOS: 隐藏 Dock 图标

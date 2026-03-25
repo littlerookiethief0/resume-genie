@@ -1,14 +1,55 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { invoke } from '@tauri-apps/api/core'
+import { openUrl } from '@tauri-apps/plugin-opener'
 import { version } from '../../package.json'
 
 const router = useRouter()
 const account = ref('')
 const loggingIn = ref(false)
+const updateUrl = ref('')
+const latestVersion = ref('')
 const MOBILE_RE = /^1\d{10}$/
+const LAST_MOBILE_KEY = 'resume_genie_last_mobile'
+
+function persistLastMobile() {
+  const v = account.value.trim()
+  if (!v) return
+  try {
+    localStorage.setItem(LAST_MOBILE_KEY, v)
+  } catch {
+    /* ignore */
+  }
+}
+
+onMounted(async () => {
+  try {
+    const saved = localStorage.getItem(LAST_MOBILE_KEY)
+    if (saved) account.value = saved
+  } catch {
+    /* ignore */
+  }
+  try {
+    const resp = await invoke<{ code: number; data: { hasUpdate: boolean; ossUrl: string; latestVersion: string } }>(
+      'check_version',
+      { currentVersion: version }
+    )
+    if (resp?.data?.hasUpdate && resp.data.ossUrl) {
+      updateUrl.value = resp.data.ossUrl
+      latestVersion.value = resp.data.latestVersion ?? ''
+    }
+  } catch {
+    // 版本检查失败不影响正常使用
+  }
+})
+
+async function openUpdate() {
+  if (updateUrl.value) {
+    await openUrl(updateUrl.value)
+  }
+}
 
 async function handleLogin() {
   const input = account.value.trim()
@@ -29,6 +70,7 @@ async function handleLogin() {
     )
     console.log('verify response:', resp)
     if (resp?.data === 1) {
+      persistLastMobile()
       router.push('/dashboard')
       return
     }
@@ -51,6 +93,8 @@ async function handleLogin() {
         v-model="account"
         placeholder="请输入11位手机号"
         size="large"
+        autocomplete="tel"
+        @blur="persistLastMobile"
         @keyup.enter="handleLogin"
       />
 
@@ -64,7 +108,14 @@ async function handleLogin() {
         登 录
       </el-button>
 
-      <p class="version">当前版本{{ version }}</p>
+      <p class="version">
+        当前版本:{{ version }}<a
+          v-if="updateUrl"
+          href="#"
+          class="version-update"
+          @click.prevent="openUpdate"
+        >（最新版本:{{ latestVersion }}）</a>
+      </p>
     </div>
   </div>
 </template>
@@ -116,5 +167,11 @@ async function handleLogin() {
   font-size: 12px;
   color: #bbb;
   margin: 0;
+}
+
+.version-update {
+  color: #6366f1;
+  cursor: pointer;
+  text-decoration: underline;
 }
 </style>
