@@ -30,7 +30,7 @@ const sites = ref<Site[]>([
     name: 'BOSS直聘',
     logo: new URL('../assets/boss.png', import.meta.url).href,
     timeFilter: 7,
-    downloadDir: './python-scripts/boss_resume',
+    downloadDir: './boss_resume',
     isRunning: false,
     accounts: []
   },
@@ -39,7 +39,7 @@ const sites = ref<Site[]>([
     name: '猎聘',
     logo: new URL('../assets/liepin.png', import.meta.url).href,
     timeFilter: 7,
-    downloadDir: './python-scripts/liepin_resume',
+    downloadDir: './liepin_resume',
     isRunning: false,
     accounts: []
   },
@@ -48,7 +48,7 @@ const sites = ref<Site[]>([
     name: '智联招聘',
     logo: new URL('../assets/zhilian.png', import.meta.url).href,
     timeFilter: 7,
-    downloadDir: './python-scripts/zhilian_resume',
+    downloadDir: './zhilian_resume',
     isRunning: false,
     accounts: []
   },
@@ -57,7 +57,7 @@ const sites = ref<Site[]>([
     name: '前程无忧',
     logo: new URL('../assets/qcwy.png', import.meta.url).href,
     timeFilter: 7,
-    downloadDir: './python-scripts/qiancheng_resume',
+    downloadDir: './qiancheng_resume',
     isRunning: false,
     accounts: []
   }

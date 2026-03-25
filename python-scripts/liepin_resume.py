@@ -147,7 +147,7 @@ class LiepinResumeCrawler:
                 # 调用mopin唤醒请求
                 mopin_request.awaken_request(parse_data)
                 save_path = os.path.join(
-                    "liepin_resume",
+                    local_utils.get_data_path("liepin_resume"),
                     f"{resume_detail_response['resumeDetailed']['baseInfo']['name']}_{resume_detail_response['extInfoDto']['usercId']}.pdf"
                 )
                 if os.path.exists(save_path):

@@ -146,7 +146,7 @@ class BossCrawler:
                 break
             next_element=self.page.locator(f'//div[@role="listitem" and @key="{next_uid}-0"]/following-sibling::div[1]')
             resume_element=self.page.locator('//a[@class="btn resume-btn-file"]')
-            save_path = os.path.join("boss_resume", f"{awaken_response['cleaned']['boss']['data']['baseInfo']['name']}_{next_uid}.pdf")
+            save_path = os.path.join(local_utils.get_data_path("boss_resume"), f"{awaken_response['cleaned']['boss']['data']['baseInfo']['name']}_{next_uid}.pdf")
             if os.path.exists(save_path):
                 print(f"文件已存在,跳过下载: {save_path}")
                 continue

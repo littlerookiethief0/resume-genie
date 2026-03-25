@@ -470,21 +470,25 @@ async fn open_directory(app: AppHandle, path: String) -> Result<(), String> {
     let abs_path = if path.starts_with("./") || path.starts_with(".\\") {
         let relative = path.trim_start_matches("./").trim_start_matches(".\\");
 
-        let final_path = if cfg!(debug_assertions) {
-            // 开发模式：resource_dir 是 src-tauri/target/debug，向上3层到项目根目录
+        if cfg!(debug_assertions) {
             let project_root = resource_dir
-                .parent().unwrap()  // src-tauri/target
-                .parent().unwrap()  // src-tauri
-                .parent().unwrap()  // 项目根目录
+                .parent().unwrap()
+                .parent().unwrap()
+                .parent().unwrap()
                 .to_path_buf();
             project_root.join(relative)
         } else {
-            // 生产模式：resource_dir 是 /Applications/简历精灵.app/Contents/Resources
-            // Python脚本在 _up_/python-scripts 下
-            resource_dir.join("_up_").join(relative)
-        };
-
-        final_path
+            let home = {
+                #[cfg(windows)]
+                { std::env::var_os("USERPROFILE").map(std::path::PathBuf::from) }
+                #[cfg(not(windows))]
+                { std::env::var_os("HOME").map(std::path::PathBuf::from) }
+            };
+            match home {
+                Some(h) => h.join(".resume-genie").join("data").join(relative),
+                None => resource_dir.join("_up_").join(relative),
+            }
+        }
     } else {
         std::path::PathBuf::from(&path)
     };

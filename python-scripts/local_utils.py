@@ -34,6 +34,7 @@ def get_cookie_string(context, urls=None):
 
 
 def save_pdf(pdf_response, file_name, save_dir="boss_resume"):
+    save_dir = get_data_path(save_dir)
     os.makedirs(save_dir, exist_ok=True)
     file_path = os.path.join(save_dir, file_name)
     with open(file_path, "wb") as f:
@@ -42,6 +43,7 @@ def save_pdf(pdf_response, file_name, save_dir="boss_resume"):
 
 def concat_boss_resume_files(directory="boss_resume"):
     """取出这个目录下的所有文件"""
+    directory = get_data_path(directory)
     file_list = [os.path.join(directory, f) for f in os.listdir(directory) if os.path.isfile(os.path.join(directory, f))]
     file_string='\n'.join(file_list)
     return file_string

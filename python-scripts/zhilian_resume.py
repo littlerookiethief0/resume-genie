@@ -113,8 +113,8 @@ class ZhilianResumeCrawler:
                 time_step=json.loads(person['lastSentence'])['sendTime']//1000
                 if not local_utils.is_in_past_days(time_step, days=days):
                     return
-                save_path=os.path.join("zhilian_resume", f"{name}_{uid}_{job_title}.pdf")
-                os.makedirs('zhilian_resume', exist_ok=True)
+                save_path=os.path.join(local_utils.get_data_path("zhilian_resume"), f"{name}_{uid}_{job_title}.pdf")
+                os.makedirs(local_utils.get_data_path("zhilian_resume"), exist_ok=True)
                 if os.path.exists(save_path):
                     print(f"文件已存在,跳过下载: {save_path}")
                     continue
