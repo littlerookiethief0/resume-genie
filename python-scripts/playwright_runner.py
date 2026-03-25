@@ -89,8 +89,23 @@ class PlaywrightBrowserManager:
         """启动 Camoufox 持久化 context，返回 context。已启动时直接返回当前 context。"""
         if self.context is not None:
             return self.context
+
+        import sys
+        print(f"[diag] Python: {sys.version}", file=sys.stderr, flush=True)
+        print(f"[diag] Platform: {platform.system()} {platform.machine()}", file=sys.stderr, flush=True)
+        print(f"[diag] CWD: {os.getcwd()}", file=sys.stderr, flush=True)
+        print(f"[diag] user_data_dir: {self.user_data_dir}", file=sys.stderr, flush=True)
+        print(f"[diag] PLAYWRIGHT_BROWSERS_PATH: {os.environ.get('PLAYWRIGHT_BROWSERS_PATH', '<not set>')}", file=sys.stderr, flush=True)
+        try:
+            import camoufox as _cf
+            print(f"[diag] camoufox version: {getattr(_cf, '__version__', 'unknown')}", file=sys.stderr, flush=True)
+            from camoufox.pkgman import get_path as _get_cf_path
+            _bp = _get_cf_path("firefox")
+            print(f"[diag] camoufox browser path: {_bp} (exists={os.path.exists(_bp)})", file=sys.stderr, flush=True)
+        except Exception as _e:
+            print(f"[diag] camoufox info error: {_e}", file=sys.stderr, flush=True)
+
         os.makedirs(self.user_data_dir, exist_ok=True)
-        # 根据当前系统选择 fingerprint 的 os，兼容 Mac/Windows 双平台打包
         _platform_os = {"Darwin": "macos", "Windows": "windows", "Linux": "linux"}.get(
             platform.system(), "macos"
         )
@@ -111,21 +126,19 @@ class PlaywrightBrowserManager:
                 "Arial",
             ],
             config={
-                # 固定字体度量随机种子，减少中文站点字体抖动/乱码
                 "fonts:spacing_seed": 0,
-                # 关闭深色主题，使用标准 Firefox 浅色 UI
                 "disableTheming": True,
             },
         )
-        # 可选：通过环境变量指定系统 Firefox 可执行文件
-        # 例如 macOS: /Applications/Firefox.app/Contents/MacOS/firefox
         firefox_path = os.environ.get("RESUME_GENIE_FIREFOX_PATH")
         if firefox_path and os.path.isfile(firefox_path):
             launch_kw["executable_path"] = firefox_path
 
+        print(f"[diag] Launching Camoufox with headless={self.headless}, os={_platform_os}", file=sys.stderr, flush=True)
         self._camoufox = Camoufox(**launch_kw)
         raw_context = self._camoufox.__enter__()
         self.context = _FirefoxContextWrapper(raw_context)
+        print("[diag] Camoufox started successfully", file=sys.stderr, flush=True)
 
         return self.context
 

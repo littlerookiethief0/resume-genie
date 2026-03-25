@@ -78,13 +78,35 @@ async fn check_version(current_version: String) -> Result<Value, String> {
     Ok(body)
 }
 
+fn get_log_file() -> Option<std::fs::File> {
+    let home = {
+        #[cfg(windows)]
+        { std::env::var_os("USERPROFILE").map(std::path::PathBuf::from) }
+        #[cfg(not(windows))]
+        { std::env::var_os("HOME").map(std::path::PathBuf::from) }
+    };
+    let log_dir = home?.join(".resume-genie").join("logs");
+    std::fs::create_dir_all(&log_dir).ok()?;
+    let log_path = log_dir.join("script_stderr.log");
+    std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(log_path)
+        .ok()
+}
+
 fn spawn_stderr_reader(stderr: std::process::ChildStderr, app: AppHandle, label: String) {
     thread::spawn(move || {
+        use std::io::Write;
+        let mut log_file = get_log_file();
         let reader = BufReader::new(stderr);
         for line in reader.lines() {
             if let Ok(line) = line {
                 eprintln!("[{}] {}", label, line);
                 let _ = app.emit("script_stderr", (&label, &line));
+                if let Some(ref mut f) = log_file {
+                    let _ = writeln!(f, "[{}] {}", label, line);
+                }
             }
         }
     });
