@@ -91,19 +91,49 @@ class PlaywrightBrowserManager:
             return self.context
 
         import sys
-        print(f"[diag] Python: {sys.version}", file=sys.stderr, flush=True)
-        print(f"[diag] Platform: {platform.system()} {platform.machine()}", file=sys.stderr, flush=True)
-        print(f"[diag] CWD: {os.getcwd()}", file=sys.stderr, flush=True)
-        print(f"[diag] user_data_dir: {self.user_data_dir}", file=sys.stderr, flush=True)
-        print(f"[diag] PLAYWRIGHT_BROWSERS_PATH: {os.environ.get('PLAYWRIGHT_BROWSERS_PATH', '<not set>')}", file=sys.stderr, flush=True)
-        try:
-            import camoufox as _cf
-            print(f"[diag] camoufox version: {getattr(_cf, '__version__', 'unknown')}", file=sys.stderr, flush=True)
-            from camoufox.pkgman import get_path as _get_cf_path
-            _bp = _get_cf_path("firefox")
-            print(f"[diag] camoufox browser path: {_bp} (exists={os.path.exists(_bp)})", file=sys.stderr, flush=True)
-        except Exception as _e:
-            print(f"[diag] camoufox info error: {_e}", file=sys.stderr, flush=True)
+        _diag = lambda msg: print(f"[diag] {msg}", file=sys.stderr, flush=True)
+        _diag(f"Python: {sys.version}")
+        _diag(f"Platform: {platform.system()} {platform.machine()}")
+        _diag(f"CWD: {os.getcwd()}")
+        _diag(f"user_data_dir: {self.user_data_dir}")
+        _diag(f"PLAYWRIGHT_BROWSERS_PATH: {os.environ.get('PLAYWRIGHT_BROWSERS_PATH', '<not set>')}")
+
+        # 主动查找 Camoufox 浏览器二进制路径
+        resolved_firefox = None
+        # 1) 环境变量指定
+        env_firefox = os.environ.get("RESUME_GENIE_FIREFOX_PATH")
+        if env_firefox and os.path.isfile(env_firefox):
+            resolved_firefox = env_firefox
+            _diag(f"Firefox from env: {resolved_firefox}")
+        # 2) camoufox 包内置路径（正常情况）
+        if not resolved_firefox:
+            try:
+                from camoufox.pkgman import get_path as _get_cf_path
+                _pkg_path = _get_cf_path("firefox")
+                _diag(f"camoufox pkg path: {_pkg_path} (exists={os.path.exists(str(_pkg_path))})")
+                if os.path.exists(str(_pkg_path)):
+                    resolved_firefox = str(_pkg_path)
+            except Exception as _e:
+                _diag(f"camoufox pkgman error: {_e}")
+        # 3) 在 browsers/ 目录下搜索（CI 可能下载到这里）
+        if not resolved_firefox:
+            browsers_dir = os.environ.get("PLAYWRIGHT_BROWSERS_PATH", "")
+            if browsers_dir and os.path.isdir(browsers_dir):
+                _diag(f"Searching browsers dir: {browsers_dir}")
+                for root, dirs, files in os.walk(browsers_dir):
+                    for f in files:
+                        if f in ("firefox.exe", "firefox", "camoufox.exe"):
+                            candidate = os.path.join(root, f)
+                            resolved_firefox = candidate
+                            _diag(f"Found browser in browsers/: {candidate}")
+                            break
+                    if resolved_firefox:
+                        break
+
+        if resolved_firefox:
+            _diag(f"Using firefox executable: {resolved_firefox}")
+        else:
+            _diag("WARNING: No firefox executable found, Camoufox will use its default discovery")
 
         os.makedirs(self.user_data_dir, exist_ok=True)
         _platform_os = {"Darwin": "macos", "Windows": "windows", "Linux": "linux"}.get(
@@ -130,15 +160,14 @@ class PlaywrightBrowserManager:
                 "disableTheming": True,
             },
         )
-        firefox_path = os.environ.get("RESUME_GENIE_FIREFOX_PATH")
-        if firefox_path and os.path.isfile(firefox_path):
-            launch_kw["executable_path"] = firefox_path
+        if resolved_firefox:
+            launch_kw["executable_path"] = resolved_firefox
 
-        print(f"[diag] Launching Camoufox with headless={self.headless}, os={_platform_os}", file=sys.stderr, flush=True)
+        _diag(f"Launching Camoufox with headless={self.headless}, os={_platform_os}")
         self._camoufox = Camoufox(**launch_kw)
         raw_context = self._camoufox.__enter__()
         self.context = _FirefoxContextWrapper(raw_context)
-        print("[diag] Camoufox started successfully", file=sys.stderr, flush=True)
+        _diag("Camoufox started successfully")
 
         return self.context
 
