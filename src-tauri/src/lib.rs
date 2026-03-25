@@ -202,7 +202,8 @@ async fn run_wake_script(
         .current_dir(&script_dir)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .env("PLAYWRIGHT_BROWSERS_PATH", &browsers_path);
+        .env("PLAYWRIGHT_BROWSERS_PATH", &browsers_path)
+        .env("PYTHONUTF8", "1");
 
     // Windows: 隐藏控制台窗口
     #[cfg(windows)]
@@ -270,7 +271,8 @@ async fn run_wake_script(
                     .current_dir(&script_dir_chain)
                     .stdout(Stdio::piped())
                     .stderr(Stdio::piped())
-                    .env("PLAYWRIGHT_BROWSERS_PATH", &parse_browsers_path);
+                    .env("PLAYWRIGHT_BROWSERS_PATH", &parse_browsers_path)
+                    .env("PYTHONUTF8", "1");
 
                 #[cfg(windows)]
                 parse_cmd.creation_flags(0x08000000);
@@ -398,7 +400,8 @@ async fn run_parse_script(
         .current_dir(&script_dir)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .env("PLAYWRIGHT_BROWSERS_PATH", &browsers_path);
+        .env("PLAYWRIGHT_BROWSERS_PATH", &browsers_path)
+        .env("PYTHONUTF8", "1");
 
     #[cfg(windows)]
     cmd.creation_flags(0x08000000);
