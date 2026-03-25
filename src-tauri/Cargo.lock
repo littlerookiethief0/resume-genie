@@ -3845,7 +3845,7 @@ dependencies = [
 
 [[package]]
 name = "resume-genie"
-version = "0.3.19"
+version = "0.3.20"
 dependencies = [
  "image",
  "reqwest 0.12.28",

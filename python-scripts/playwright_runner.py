@@ -1,7 +1,16 @@
 import re
 import os
 import platform
+import struct
 import subprocess
+
+# Windows ARM64 + x86_64 Python: Camoufox 不支持 win-arm64，但 x86_64 Firefox
+# 可通过 WoW64 模拟正常运行，覆盖架构检测使其使用 x86_64 二进制
+if (platform.system() == "Windows"
+        and platform.machine().lower() in ("arm64", "aarch64")
+        and struct.calcsize("P") * 8 == 64):
+    platform.machine = lambda: "AMD64"
+
 from camoufox.sync_api import Camoufox
 
 try:
