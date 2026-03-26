@@ -20,9 +20,10 @@ except ImportError:
 
 
 def _restore_bundled_camoufox_cache():
-    """从打包的 camoufox_cache 还原浏览器到用户缓存，避免运行时下载 530MB。"""
+    """从打包的 camoufox_cache.zip（或目录）还原浏览器到用户缓存，避免运行时下载 530MB。"""
     import shutil
     import sys
+    import zipfile
     _diag = lambda msg: print(f"[diag] {msg}", file=sys.stderr, flush=True)
 
     try:
@@ -31,10 +32,8 @@ def _restore_bundled_camoufox_cache():
         return
 
     script_dir = os.path.dirname(os.path.abspath(__file__))
-    bundled = os.path.join(script_dir, "camoufox_cache")
-    if not os.path.isdir(bundled):
-        _diag(f"No bundled camoufox_cache at {bundled}")
-        return
+    bundled_zip = os.path.join(script_dir, "camoufox_cache.zip")
+    bundled_dir = os.path.join(script_dir, "camoufox_cache")
 
     user_cache = platformdirs.user_cache_dir("camoufox")
     firefox_in_cache = os.path.join(user_cache, "firefox")
@@ -42,10 +41,22 @@ def _restore_bundled_camoufox_cache():
         _diag(f"Camoufox cache already present: {firefox_in_cache}")
         return
 
-    _diag(f"Restoring camoufox cache from bundle to {user_cache}")
-    os.makedirs(user_cache, exist_ok=True)
-    shutil.copytree(bundled, user_cache, dirs_exist_ok=True)
-    _diag("Camoufox cache restored successfully")
+    if os.path.isfile(bundled_zip):
+        _diag(f"Extracting bundled camoufox_cache.zip to {user_cache}")
+        os.makedirs(user_cache, exist_ok=True)
+        with zipfile.ZipFile(bundled_zip, "r") as zf:
+            zf.extractall(user_cache)
+        _diag("Camoufox cache extracted successfully")
+        return
+
+    if os.path.isdir(bundled_dir):
+        _diag(f"Restoring camoufox cache from directory to {user_cache}")
+        os.makedirs(user_cache, exist_ok=True)
+        shutil.copytree(bundled_dir, user_cache, dirs_exist_ok=True)
+        _diag("Camoufox cache restored successfully")
+        return
+
+    _diag(f"No bundled camoufox_cache.zip or camoufox_cache dir under {script_dir}")
 
 
 def _detect_screen_size():
