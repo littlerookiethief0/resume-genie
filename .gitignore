@@ -20,6 +20,7 @@ data
 
 # Camoufox 浏览器（构建时下载，打包进应用）
 python-scripts/browsers/
+python-scripts/camoufox_cache/
 
 # Resume PDFs (download artifacts)
 boss_resume/

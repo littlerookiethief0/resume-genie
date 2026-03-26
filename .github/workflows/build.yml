@@ -141,6 +141,13 @@ jobs:
           ./python/bin/python3 -m pip install -r requirements.txt
           mkdir -p browsers
           env PLAYWRIGHT_BROWSERS_PATH="$(pwd)/browsers" ./python/bin/python3 -m camoufox fetch || echo "::warning::camoufox fetch failed (rate limit?), app will download browser on first run"
+          CF_CACHE=$(./python/bin/python3 -c "import platformdirs; print(platformdirs.user_cache_dir('camoufox'))")
+          if [ -d "$CF_CACHE" ]; then
+            cp -R "$CF_CACHE" camoufox_cache
+            echo "Bundled camoufox cache from $CF_CACHE ($(du -sh camoufox_cache | cut -f1))"
+          else
+            echo "::warning::camoufox cache not found at $CF_CACHE"
+          fi
 
       - name: Download standalone Python (Windows)
         if: matrix.platform == 'windows-latest'
@@ -156,6 +163,13 @@ jobs:
           mkdir browsers
           $env:PLAYWRIGHT_BROWSERS_PATH = "$PWD\browsers"
           python\python.exe -m camoufox fetch || echo "::warning::camoufox fetch failed (rate limit?), app will download browser on first run"
+          $CF_CACHE = python\python.exe -c "import platformdirs; print(platformdirs.user_cache_dir('camoufox'))"
+          if (Test-Path $CF_CACHE) {
+            Copy-Item -Recurse -Force $CF_CACHE camoufox_cache
+            echo "Bundled camoufox cache from $CF_CACHE"
+          } else {
+            echo "::warning::camoufox cache not found at $CF_CACHE"
+          }
 
       - name: Install frontend dependencies
         run: pnpm install

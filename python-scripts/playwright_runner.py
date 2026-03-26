@@ -19,6 +19,35 @@ except ImportError:
     from local_utils import get_data_path
 
 
+def _restore_bundled_camoufox_cache():
+    """从打包的 camoufox_cache 还原浏览器到用户缓存，避免运行时下载 530MB。"""
+    import shutil
+    import sys
+    _diag = lambda msg: print(f"[diag] {msg}", file=sys.stderr, flush=True)
+
+    try:
+        import platformdirs
+    except ImportError:
+        return
+
+    script_dir = os.path.dirname(os.path.abspath(__file__))
+    bundled = os.path.join(script_dir, "camoufox_cache")
+    if not os.path.isdir(bundled):
+        _diag(f"No bundled camoufox_cache at {bundled}")
+        return
+
+    user_cache = platformdirs.user_cache_dir("camoufox")
+    firefox_in_cache = os.path.join(user_cache, "firefox")
+    if os.path.exists(firefox_in_cache):
+        _diag(f"Camoufox cache already present: {firefox_in_cache}")
+        return
+
+    _diag(f"Restoring camoufox cache from bundle to {user_cache}")
+    os.makedirs(user_cache, exist_ok=True)
+    shutil.copytree(bundled, user_cache, dirs_exist_ok=True)
+    _diag("Camoufox cache restored successfully")
+
+
 def _detect_screen_size():
     """检测屏幕逻辑分辨率，失败时返回平台安全默认值。"""
     system = platform.system()
@@ -98,6 +127,8 @@ class PlaywrightBrowserManager:
         """启动 Camoufox 持久化 context，返回 context。已启动时直接返回当前 context。"""
         if self.context is not None:
             return self.context
+
+        _restore_bundled_camoufox_cache()
 
         import sys
         _diag = lambda msg: print(f"[diag] {msg}", file=sys.stderr, flush=True)
