@@ -19,6 +19,45 @@ except ImportError:
     from local_utils import get_data_path
 
 
+def _flatten_camoufox_cache_dir(user_cache, _diag):
+    """
+    zip 根目录若多包了一层 Cache/ 或 camoufox/Cache/，解压后 firefox 不在
+    user_cache/firefox，camoufox get_path 会找不到。把子目录内容上移一层。
+    """
+    import shutil
+
+    firefox_target = os.path.join(user_cache, "firefox")
+    if os.path.exists(firefox_target):
+        return
+
+    for rel in (("Cache",), ("camoufox", "Cache")):
+        base = os.path.join(user_cache, *rel)
+        inner_firefox = os.path.join(base, "firefox")
+        if os.path.isdir(base) and os.path.exists(inner_firefox):
+            _diag(f"Flattening misplaced cache layer {rel} -> {user_cache}")
+            for name in os.listdir(base):
+                src = os.path.join(base, name)
+                dst = os.path.join(user_cache, name)
+                if os.path.exists(dst):
+                    if os.path.isdir(dst):
+                        shutil.rmtree(dst)
+                    else:
+                        os.remove(dst)
+                shutil.move(src, dst)
+            try:
+                walk_up = base
+                while walk_up.startswith(user_cache) and walk_up != user_cache:
+                    if not os.path.isdir(walk_up):
+                        break
+                    if os.listdir(walk_up):
+                        break
+                    os.rmdir(walk_up)
+                    walk_up = os.path.dirname(walk_up)
+            except OSError:
+                pass
+            return
+
+
 def _restore_bundled_camoufox_cache():
     """从打包的 camoufox_cache.zip（或目录）还原浏览器到用户缓存，避免运行时下载 530MB。"""
     import shutil
@@ -46,13 +85,22 @@ def _restore_bundled_camoufox_cache():
         os.makedirs(user_cache, exist_ok=True)
         with zipfile.ZipFile(bundled_zip, "r") as zf:
             zf.extractall(user_cache)
-        _diag("Camoufox cache extracted successfully")
+        _flatten_camoufox_cache_dir(user_cache, _diag)
+        if os.path.exists(firefox_in_cache):
+            _diag("Camoufox cache extracted successfully")
+        else:
+            try:
+                top = os.listdir(user_cache)[:30]
+            except OSError:
+                top = []
+            _diag(f"WARNING: after extract, firefox missing at {firefox_in_cache}; top-level entries: {top}")
         return
 
     if os.path.isdir(bundled_dir):
         _diag(f"Restoring camoufox cache from directory to {user_cache}")
         os.makedirs(user_cache, exist_ok=True)
         shutil.copytree(bundled_dir, user_cache, dirs_exist_ok=True)
+        _flatten_camoufox_cache_dir(user_cache, _diag)
         _diag("Camoufox cache restored successfully")
         return
 

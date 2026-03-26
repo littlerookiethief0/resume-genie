@@ -45,8 +45,24 @@ class BossCrawler:
             self.awaken_list_request(response.json())
 
     def login(self):
-        login_response=self.page.request.get("https://www.zhipin.com/wapi/hunter/h5/hunterManage/checkAuth")
-        login_data=login_response.json()
+        # 先打开主站，否则 request 无站点 cookie，易被风控或返回空/HTML，json() 会抛错
+        self.page.goto(
+            "https://www.zhipin.com/",
+            wait_until="domcontentloaded",
+            timeout=60000,
+        )
+        login_response = self.page.request.get(
+            "https://www.zhipin.com/wapi/hunter/h5/hunterManage/checkAuth"
+        )
+        raw = login_response.text() or ""
+        try:
+            login_data = login_response.json()
+        except json.JSONDecodeError:
+            print(
+                f"checkAuth 非 JSON（status={login_response.status} 前200字符）: {raw[:200]!r}",
+                flush=True,
+            )
+            login_data = {}
         if login_data.get('message') != "Success":
             self.page.goto("https://www.baidu.com/")
             self.page.locator('//div[@id="chat-input-area"]/textarea').fill("boss直聘")
