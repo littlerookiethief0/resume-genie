@@ -2,6 +2,7 @@ use std::process::{Command, Stdio};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::io::{BufRead, BufReader};
+use std::path::Path;
 use serde_json::{json, Value};
 use tauri::{AppHandle, Emitter, State, Manager};
 use tauri::menu::{Menu, MenuItem};
@@ -112,6 +113,18 @@ fn spawn_stderr_reader(stderr: std::process::ChildStderr, app: AppHandle, label:
     });
 }
 
+/// Tauri 在 macOS 上常将 `bundle.resources` 展开为 `Resources/_up_/python-scripts`，
+/// Windows 上可能为 `Resources/python-scripts`（见 `.github/PACKAGING_ISSUES.md`）。
+fn packaged_python_scripts_dir(resource_dir: &Path) -> std::path::PathBuf {
+    let with_up = resource_dir.join("_up_").join("python-scripts");
+    let flat = resource_dir.join("python-scripts");
+    if with_up.is_dir() {
+        with_up
+    } else {
+        flat
+    }
+}
+
 fn kill_process_by_pid(pid: u32) {
     #[cfg(unix)]
     {
@@ -153,7 +166,7 @@ async fn run_wake_script(
         .map_err(|e| format!("Failed to get resource dir: {}", e))?;
 
     // 尝试使用打包的 Python（生产模式）
-    let packaged_dir = resource_dir.join("_up_").join("python-scripts");
+    let packaged_dir = packaged_python_scripts_dir(&resource_dir);
     #[cfg(target_os = "windows")]
     let packaged_python = packaged_dir.join("python").join("python.exe");
     #[cfg(not(target_os = "windows"))]
@@ -355,7 +368,7 @@ async fn run_parse_script(
         .resource_dir()
         .map_err(|e| format!("Failed to get resource dir: {}", e))?;
 
-    let packaged_dir = resource_dir.join("_up_").join("python-scripts");
+    let packaged_dir = packaged_python_scripts_dir(&resource_dir);
     #[cfg(target_os = "windows")]
     let packaged_python = packaged_dir.join("python").join("python.exe");
     #[cfg(not(target_os = "windows"))]
