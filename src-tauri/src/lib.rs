@@ -125,6 +125,29 @@ fn packaged_python_scripts_dir(resource_dir: &Path) -> std::path::PathBuf {
     }
 }
 
+/// 从资源管理器启动的 GUI 进程在 Windows 上可能缺少 USERPROFILE/LOCALAPPDATA，
+/// 与 Python 侧 playwright_runner 的环境补全配合，供 camoufox 写入用户缓存。
+fn apply_gui_python_env(cmd: &mut Command) {
+    #[cfg(windows)]
+    {
+        if std::env::var_os("USERPROFILE").is_none() {
+            if let (Ok(drive), Ok(path)) = (std::env::var("HOMEDRIVE"), std::env::var("HOMEPATH")) {
+                let home = format!("{}{}", drive, path);
+                cmd.env("USERPROFILE", &home);
+                cmd.env("HOME", &home);
+            }
+        }
+        if std::env::var_os("LOCALAPPDATA").is_none() {
+            if let Ok(up) = std::env::var("USERPROFILE") {
+                cmd.env("LOCALAPPDATA", format!("{}\\AppData\\Local", up));
+                cmd.env("APPDATA", format!("{}\\AppData\\Roaming", up));
+            }
+        }
+    }
+    #[cfg(not(windows))]
+    let _ = cmd;
+}
+
 fn kill_process_by_pid(pid: u32) {
     #[cfg(unix)]
     {
@@ -217,6 +240,7 @@ async fn run_wake_script(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .env("PYTHONUTF8", "1");
+    apply_gui_python_env(&mut cmd);
 
     // Windows: 隐藏控制台窗口
     #[cfg(windows)]
@@ -284,6 +308,7 @@ async fn run_wake_script(
                     .stdout(Stdio::piped())
                     .stderr(Stdio::piped())
                     .env("PYTHONUTF8", "1");
+                apply_gui_python_env(&mut parse_cmd);
 
                 #[cfg(windows)]
                 parse_cmd.creation_flags(0x08000000);
@@ -411,6 +436,7 @@ async fn run_parse_script(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .env("PYTHONUTF8", "1");
+    apply_gui_python_env(&mut cmd);
 
     #[cfg(windows)]
     cmd.creation_flags(0x08000000);
