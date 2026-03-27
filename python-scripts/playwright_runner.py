@@ -3,6 +3,7 @@ import os
 import platform
 import struct
 import subprocess
+import sys
 
 # Windows ARM64 + x86_64 Python: Camoufox 不支持 win-arm64，但 x86_64 Firefox
 # 可通过 WoW64 模拟正常运行，覆盖架构检测使其使用 x86_64 二进制
@@ -17,6 +18,50 @@ try:
     from .local_utils import get_data_path
 except ImportError:
     from local_utils import get_data_path
+
+
+def _ensure_camoufox_executable(_diag):
+    """
+    确保本机已存在 Camoufox 官方浏览器二进制，并返回其绝对路径。
+    仅使用 camoufox/pkgman 管理的路径；若缺失则执行一次 `python -m camoufox fetch`。
+    不支持系统 Firefox、Playwright 预置 firefox 或其它可执行文件覆盖。
+    """
+    from camoufox.pkgman import get_path as _get_cf_path
+
+    def _firefox_path():
+        return str(_get_cf_path("firefox"))
+
+    try:
+        path = _firefox_path()
+    except Exception as e:
+        _diag(f"camoufox get_path error: {e}")
+        raise RuntimeError(
+            "无法解析 Camoufox 浏览器路径，请确认已安装 camoufox Python 包。"
+        ) from e
+
+    if os.path.isfile(path):
+        _diag(f"Camoufox browser present: {path}")
+        return path
+
+    _diag("Camoufox binary missing, running: python -m camoufox fetch")
+    r = subprocess.run(
+        [sys.executable, "-m", "camoufox", "fetch"],
+        timeout=900,
+        env=os.environ.copy(),
+    )
+    if r.returncode != 0:
+        raise RuntimeError(
+            f"camoufox fetch 失败 (exit {r.returncode})，请检查网络后重试，"
+            f"或手动执行: {sys.executable} -m camoufox fetch"
+        )
+
+    path = _firefox_path()
+    if not os.path.isfile(path):
+        raise RuntimeError(
+            f"camoufox fetch 已完成但仍找不到 Camoufox 可执行文件: {path}"
+        )
+    _diag(f"Camoufox fetch finished, using: {path}")
+    return path
 
 
 def _detect_screen_size():
@@ -79,7 +124,7 @@ class _FirefoxContextWrapper:
 
 class PlaywrightBrowserManager:
     """
-    使用 Camoufox(Firefox) 持久化 context。
+    使用 Camoufox 持久化 context（仅官方 Camoufox 二进制，不经由系统 Firefox）。
     支持 with 用法和 start/close_tabs/disconnect 用法。
     """
 
@@ -99,52 +144,12 @@ class PlaywrightBrowserManager:
         if self.context is not None:
             return self.context
 
-        # 不在安装包内预置 Camoufox 缓存；首次启动由 camoufox/pkgman 在本机下载，避免同源指纹簇。
-
-        import sys
         _diag = lambda msg: print(f"[diag] {msg}", file=sys.stderr, flush=True)
+        camoufox_exe = _ensure_camoufox_executable(_diag)
         _diag(f"Python: {sys.version}")
         _diag(f"Platform: {platform.system()} {platform.machine()}")
         _diag(f"CWD: {os.getcwd()}")
         _diag(f"user_data_dir: {self.user_data_dir}")
-        _diag(f"PLAYWRIGHT_BROWSERS_PATH: {os.environ.get('PLAYWRIGHT_BROWSERS_PATH', '<not set>')}")
-
-        # 主动查找 Camoufox 浏览器二进制路径
-        resolved_firefox = None
-        # 1) 环境变量指定
-        env_firefox = os.environ.get("RESUME_GENIE_FIREFOX_PATH")
-        if env_firefox and os.path.isfile(env_firefox):
-            resolved_firefox = env_firefox
-            _diag(f"Firefox from env: {resolved_firefox}")
-        # 2) camoufox 包内置路径（正常情况）
-        if not resolved_firefox:
-            try:
-                from camoufox.pkgman import get_path as _get_cf_path
-                _pkg_path = _get_cf_path("firefox")
-                _diag(f"camoufox pkg path: {_pkg_path} (exists={os.path.exists(str(_pkg_path))})")
-                if os.path.exists(str(_pkg_path)):
-                    resolved_firefox = str(_pkg_path)
-            except Exception as _e:
-                _diag(f"camoufox pkgman error: {_e}")
-        # 3) 在 browsers/ 目录下搜索（CI 可能下载到这里）
-        if not resolved_firefox:
-            browsers_dir = os.environ.get("PLAYWRIGHT_BROWSERS_PATH", "")
-            if browsers_dir and os.path.isdir(browsers_dir):
-                _diag(f"Searching browsers dir: {browsers_dir}")
-                for root, dirs, files in os.walk(browsers_dir):
-                    for f in files:
-                        if f in ("firefox.exe", "firefox", "camoufox.exe"):
-                            candidate = os.path.join(root, f)
-                            resolved_firefox = candidate
-                            _diag(f"Found browser in browsers/: {candidate}")
-                            break
-                    if resolved_firefox:
-                        break
-
-        if resolved_firefox:
-            _diag(f"Using firefox executable: {resolved_firefox}")
-        else:
-            _diag("WARNING: No firefox executable found, Camoufox will use its default discovery")
 
         os.makedirs(self.user_data_dir, exist_ok=True)
         _platform_os = {"Darwin": "macos", "Windows": "windows", "Linux": "linux"}.get(
@@ -170,9 +175,8 @@ class PlaywrightBrowserManager:
                 "fonts:spacing_seed": 0,
                 "disableTheming": True,
             },
+            executable_path=camoufox_exe,
         )
-        if resolved_firefox:
-            launch_kw["executable_path"] = resolved_firefox
 
         _diag(f"Launching Camoufox with headless={self.headless}, os={_platform_os}")
         self._camoufox = Camoufox(**launch_kw)
