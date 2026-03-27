@@ -195,14 +195,14 @@ async fn run_wake_script(
         return Err(format!("Python not found: {:?}", python_exe));
     }
 
-    let browsers_path = script_dir.join("browsers");
+    // 不设置 PLAYWRIGHT_BROWSERS_PATH 指向包内目录：Camoufox 二进制由首次运行
+    // `python -m camoufox fetch` 下载到用户缓存（camoufox/pkgman），不应打进安装包。
     let mut cmd = Command::new(&python_exe);
     cmd.arg("-u")
         .arg(&script_path)
         .current_dir(&script_dir)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .env("PLAYWRIGHT_BROWSERS_PATH", &browsers_path)
         .env("PYTHONUTF8", "1");
 
     // Windows: 隐藏控制台窗口
@@ -261,7 +261,6 @@ async fn run_wake_script(
         if auto_parse {
             let parse_script = script_dir_chain.join(format!("{}_resume.py", site_id_clone));
             if parse_script.exists() {
-                let parse_browsers_path = script_dir_chain.join("browsers");
                 let mut parse_cmd = Command::new(&python_exe_chain);
                 parse_cmd
                     .arg("-u")
@@ -271,7 +270,6 @@ async fn run_wake_script(
                     .current_dir(&script_dir_chain)
                     .stdout(Stdio::piped())
                     .stderr(Stdio::piped())
-                    .env("PLAYWRIGHT_BROWSERS_PATH", &parse_browsers_path)
                     .env("PYTHONUTF8", "1");
 
                 #[cfg(windows)]
@@ -391,7 +389,6 @@ async fn run_parse_script(
         return Err(format!("Python not found: {:?}", python_exe));
     }
 
-    let browsers_path = script_dir.join("browsers");
     let mut cmd = Command::new(&python_exe);
     cmd.arg("-u")
         .arg(&script_path)
@@ -400,7 +397,6 @@ async fn run_parse_script(
         .current_dir(&script_dir)
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
-        .env("PLAYWRIGHT_BROWSERS_PATH", &browsers_path)
         .env("PYTHONUTF8", "1");
 
     #[cfg(windows)]

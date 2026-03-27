@@ -155,6 +155,13 @@ jobs:
       - name: Install frontend dependencies
         run: pnpm install
 
+      # 安装包内不包含 Camoufox 浏览器二进制；首次启动由 playwright_runner 触发 fetch
+      - name: Strip Camoufox browser dirs before bundle
+        shell: bash
+        run: |
+          rm -rf python-scripts/browsers python-scripts/camoufox_cache
+          rm -f python-scripts/camoufox_cache.zip
+
       - name: Build Tauri app
         uses: tauri-apps/tauri-action@v0
         env:

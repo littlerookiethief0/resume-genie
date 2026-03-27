@@ -24,6 +24,7 @@ def _ensure_camoufox_executable(_diag):
     """
     确保本机已存在 Camoufox 官方浏览器二进制，并返回其绝对路径。
     仅使用 camoufox/pkgman 管理的路径；若缺失则执行一次 `python -m camoufox fetch`。
+    浏览器下载在用户本机缓存目录，不随桌面客户端安装包分发。
     不支持系统 Firefox、Playwright 预置 firefox 或其它可执行文件覆盖。
     """
     from camoufox.pkgman import get_path as _get_cf_path
