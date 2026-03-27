@@ -19,94 +19,6 @@ except ImportError:
     from local_utils import get_data_path
 
 
-def _flatten_camoufox_cache_dir(user_cache, _diag):
-    """
-    zip 根目录若多包了一层 Cache/ 或 camoufox/Cache/，解压后 firefox 不在
-    user_cache/firefox，camoufox get_path 会找不到。把子目录内容上移一层。
-    """
-    import shutil
-
-    firefox_target = os.path.join(user_cache, "firefox")
-    if os.path.exists(firefox_target):
-        return
-
-    for rel in (("Cache",), ("camoufox", "Cache")):
-        base = os.path.join(user_cache, *rel)
-        inner_firefox = os.path.join(base, "firefox")
-        if os.path.isdir(base) and os.path.exists(inner_firefox):
-            _diag(f"Flattening misplaced cache layer {rel} -> {user_cache}")
-            for name in os.listdir(base):
-                src = os.path.join(base, name)
-                dst = os.path.join(user_cache, name)
-                if os.path.exists(dst):
-                    if os.path.isdir(dst):
-                        shutil.rmtree(dst)
-                    else:
-                        os.remove(dst)
-                shutil.move(src, dst)
-            try:
-                walk_up = base
-                while walk_up.startswith(user_cache) and walk_up != user_cache:
-                    if not os.path.isdir(walk_up):
-                        break
-                    if os.listdir(walk_up):
-                        break
-                    os.rmdir(walk_up)
-                    walk_up = os.path.dirname(walk_up)
-            except OSError:
-                pass
-            return
-
-
-def _restore_bundled_camoufox_cache():
-    """从打包的 camoufox_cache.zip（或目录）还原浏览器到用户缓存，避免运行时下载 530MB。"""
-    import shutil
-    import sys
-    import zipfile
-    _diag = lambda msg: print(f"[diag] {msg}", file=sys.stderr, flush=True)
-
-    try:
-        import platformdirs
-    except ImportError:
-        return
-
-    script_dir = os.path.dirname(os.path.abspath(__file__))
-    bundled_zip = os.path.join(script_dir, "camoufox_cache.zip")
-    bundled_dir = os.path.join(script_dir, "camoufox_cache")
-
-    user_cache = platformdirs.user_cache_dir("camoufox")
-    firefox_in_cache = os.path.join(user_cache, "firefox")
-    if os.path.exists(firefox_in_cache):
-        _diag(f"Camoufox cache already present: {firefox_in_cache}")
-        return
-
-    if os.path.isfile(bundled_zip):
-        _diag(f"Extracting bundled camoufox_cache.zip to {user_cache}")
-        os.makedirs(user_cache, exist_ok=True)
-        with zipfile.ZipFile(bundled_zip, "r") as zf:
-            zf.extractall(user_cache)
-        _flatten_camoufox_cache_dir(user_cache, _diag)
-        if os.path.exists(firefox_in_cache):
-            _diag("Camoufox cache extracted successfully")
-        else:
-            try:
-                top = os.listdir(user_cache)[:30]
-            except OSError:
-                top = []
-            _diag(f"WARNING: after extract, firefox missing at {firefox_in_cache}; top-level entries: {top}")
-        return
-
-    if os.path.isdir(bundled_dir):
-        _diag(f"Restoring camoufox cache from directory to {user_cache}")
-        os.makedirs(user_cache, exist_ok=True)
-        shutil.copytree(bundled_dir, user_cache, dirs_exist_ok=True)
-        _flatten_camoufox_cache_dir(user_cache, _diag)
-        _diag("Camoufox cache restored successfully")
-        return
-
-    _diag(f"No bundled camoufox_cache.zip or camoufox_cache dir under {script_dir}")
-
-
 def _detect_screen_size():
     """检测屏幕逻辑分辨率，失败时返回平台安全默认值。"""
     system = platform.system()
@@ -187,7 +99,7 @@ class PlaywrightBrowserManager:
         if self.context is not None:
             return self.context
 
-        _restore_bundled_camoufox_cache()
+        # 不在安装包内预置 Camoufox 缓存；首次启动由 camoufox/pkgman 在本机下载，避免同源指纹簇。
 
         import sys
         _diag = lambda msg: print(f"[diag] {msg}", file=sys.stderr, flush=True)

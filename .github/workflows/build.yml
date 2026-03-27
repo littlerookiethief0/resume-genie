@@ -139,10 +139,6 @@ jobs:
           tar -xzf python.tar.gz -C python --strip-components=1
           rm python.tar.gz
           ./python/bin/python3 -m pip install -r requirements.txt
-          mkdir -p browsers
-          env PLAYWRIGHT_BROWSERS_PATH="$(pwd)/browsers" ./python/bin/python3 -m camoufox fetch || echo "::warning::camoufox fetch failed (rate limit?), app will download browser on first run"
-          # 打成单个 zip，避免 WiX/CAB 对文件数量上限导致 light.exe 失败；路径用脚本内 .strip() 避免换行
-          ./python/bin/python3 ci_bundle_camoufox_zip.py
 
       - name: Download standalone Python (Windows)
         if: matrix.platform == 'windows-latest'
@@ -155,10 +151,6 @@ jobs:
           tar -xzf python.tar.gz -C python --strip-components=1
           Remove-Item python.tar.gz
           python\python.exe -m pip install -r requirements.txt
-          mkdir browsers
-          $env:PLAYWRIGHT_BROWSERS_PATH = "$PWD\browsers"
-          python\python.exe -m camoufox fetch || echo "::warning::camoufox fetch failed (rate limit?), app will download browser on first run"
-          python\python.exe ci_bundle_camoufox_zip.py
 
       - name: Install frontend dependencies
         run: pnpm install
