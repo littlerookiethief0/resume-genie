@@ -5,49 +5,7 @@ import struct
 import subprocess
 import sys
 from pathlib import Path
-
-# Windows ARM64 + x86_64 Python: Camoufox 不支持 win-arm64，但 x86_64 Firefox
-# 可通过 WoW64 模拟正常运行，覆盖架构检测使其使用 x86_64 二进制
-if (platform.system() == "Windows"
-        and platform.machine().lower() in ("arm64", "aarch64")
-        and struct.calcsize("P") * 8 == 64):
-    platform.machine = lambda: "AMD64"
-
-
-def _apply_camoufox_env_early():
-    """
-    Tauri/GUI 启动的 Python 常缺少 HOME、USERPROFILE、LOCALAPPDATA，
-    camoufox/pkgman 依赖 platformdirs 解析缓存目录，缺变量会导致 fetch 写入错误路径或启动失败。
-    必须在 import camoufox 之前执行。
-    """
-    try:
-        home = Path.home()
-    except Exception:
-        return
-    hs = str(home)
-    system = platform.system()
-    if system == "Windows":
-        os.environ.setdefault("USERPROFILE", hs)
-        os.environ.setdefault("HOME", hs)
-        os.environ.setdefault("LOCALAPPDATA", str(home / "AppData" / "Local"))
-        os.environ.setdefault("APPDATA", str(home / "AppData" / "Roaming"))
-        tmp = home / "AppData" / "Local" / "Temp"
-        os.environ.setdefault("TEMP", str(tmp))
-        os.environ.setdefault("TMP", str(tmp))
-    else:
-        os.environ.setdefault("HOME", hs)
-        if system != "Darwin":
-            os.environ.setdefault("XDG_CACHE_HOME", str(home / ".cache"))
-    try:
-        import certifi
-        os.environ.setdefault("SSL_CERT_FILE", certifi.where())
-    except Exception:
-        pass
-
-
-_apply_camoufox_env_early()
-
-from camoufox.sync_api import Camoufox
+from playwright.sync_api import Browser, BrowserContext, Page
 
 try:
     from .local_utils import get_data_path
@@ -55,185 +13,27 @@ except ImportError:
     from local_utils import get_data_path
 
 
-def _ensure_camoufox_executable(_diag):
-    """
-    确保本机已存在 Camoufox 官方浏览器二进制，并返回其绝对路径。
-    仅使用 camoufox/pkgman 管理的路径；若缺失则执行一次 `python -m camoufox fetch`。
-    浏览器下载在用户本机缓存目录（如 macOS ~/Library/Caches、Windows %LOCALAPPDATA%），不随安装包分发。
-    不支持系统 Firefox、Playwright 预置 firefox 或其它可执行文件覆盖。
-    """
-    _apply_camoufox_env_early()
-    _diag(
-        f"camoufox env: HOME={os.environ.get('HOME')!r} "
-        f"USERPROFILE={os.environ.get('USERPROFILE')!r} "
-        f"LOCALAPPDATA={os.environ.get('LOCALAPPDATA')!r}"
-    )
-
-    from camoufox.pkgman import get_path as _get_cf_path
-
-    def _firefox_path():
-        return str(_get_cf_path("firefox"))
-
-    try:
-        path = _firefox_path()
-    except Exception as e:
-        _diag(f"camoufox get_path error: {e}")
-        raise RuntimeError(
-            "无法解析 Camoufox 浏览器路径，请确认已安装 camoufox Python 包。"
-        ) from e
-
-    if os.path.isfile(path):
-        _diag(f"Camoufox browser present: {path}")
-        return path
-
-    _diag("Camoufox binary missing, running: python -m camoufox fetch")
-    env = os.environ.copy()
-    r = subprocess.run(
-        [sys.executable, "-m", "camoufox", "fetch"],
-        timeout=900,
-        env=env,
-        capture_output=True,
-        text=True,
-    )
-    if r.stdout:
-        _diag(f"camoufox fetch stdout (tail): {r.stdout[-4000:]}")
-    if r.stderr:
-        _diag(f"camoufox fetch stderr (tail): {r.stderr[-4000:]}")
-    if r.returncode != 0:
-        raise RuntimeError(
-            f"camoufox fetch 失败 (exit {r.returncode})，请检查网络/代理后重试。"
-            f" 可手动执行: {sys.executable} -m camoufox fetch"
-        )
-
-    path = _firefox_path()
-    if not os.path.isfile(path):
-        raise RuntimeError(
-            f"camoufox fetch 已完成但仍找不到可执行文件（期望路径）: {path}"
-        )
-    _diag(f"Camoufox fetch finished, using: {path}")
-    return path
-
-
-def _detect_screen_size():
-    """检测屏幕逻辑分辨率，失败时返回平台安全默认值。"""
-    system = platform.system()
-    try:
-        if system == "Darwin":
-            out = subprocess.check_output(
-                [
-                    "python3", "-c",
-                    "import Quartz;"
-                    "b=Quartz.CGDisplayBounds(Quartz.CGMainDisplayID());"
-                    "print(int(b.size.width),int(b.size.height))",
-                ],
-                timeout=5,
-                stderr=subprocess.DEVNULL,
-            ).decode().strip()
-            w, h = out.split()
-            return int(w), int(h)
-        if system == "Windows":
-            import ctypes
-            user32 = ctypes.windll.user32
-            user32.SetProcessDPIAware()
-            return user32.GetSystemMetrics(0), user32.GetSystemMetrics(1)
-    except Exception:
-        pass
-    if system == "Darwin":
-        return 1440, 900
-    if system == "Windows":
-        return 1920, 1080
-    return 1366, 768
-
-
-class _FirefoxContextWrapper:
-    """
-    包装 Firefox 持久化 context：new_page() 优先复用已有页面，避免多窗口。
-    Firefox 中 new_page() 会开新窗口而非新标签。
-    """
-
-    def __init__(self, context):
-        self._context = context
-
-    def new_page(self):
-        if self._context.pages:
-            page = self._context.pages[0]
-        else:
-            page = self._context.new_page()
-        try:
-            page.evaluate(
-                "window.moveTo(0,0);"
-                "window.resizeTo(screen.availWidth, screen.availHeight);"
-            )
-        except Exception:
-            pass
-        return page
-
-    def __getattr__(self, name):
-        return getattr(self._context, name)
-
-
 class PlaywrightBrowserManager:
-    """
-    使用 Camoufox 持久化 context（仅官方 Camoufox 二进制，不经由系统 Firefox）。
-    支持 with 用法和 start/close_tabs/disconnect 用法。
-    """
-
     def __init__(self, user_data_dir=None, headless=False):
-        self.user_data_dir = user_data_dir or get_data_path("camoufox_profile")
-        self.headless = headless
-        self._camoufox = None
-        self.context = None
-        _default_ua = {
-            "Darwin": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10.15; rv:133.0) Gecko/20100101 Firefox/133.0",
-            "Windows": "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:133.0) Gecko/20100101 Firefox/133.0",
-        }.get(platform.system(), "Mozilla/5.0 (X11; Linux x86_64; rv:133.0) Gecko/20100101 Firefox/133.0")
-        self.user_agent = os.environ.get("RESUME_GENIE_USER_AGENT", _default_ua)
+        self.browser: Browser = None
+        self.context: BrowserContext = None
+        self.page: Page = None
+
+        self._playwright = None
 
     def start(self):
-        """启动 Camoufox 持久化 context，返回 context。已启动时直接返回当前 context。"""
-        if self.context is not None:
-            return self.context
 
-        _diag = lambda msg: print(f"[diag] {msg}", file=sys.stderr, flush=True)
-        camoufox_exe = _ensure_camoufox_executable(_diag)
-        _diag(f"Python: {sys.version}")
-        _diag(f"Platform: {platform.system()} {platform.machine()}")
-        _diag(f"CWD: {os.getcwd()}")
-        _diag(f"user_data_dir: {self.user_data_dir}")
+        from playwright.sync_api import sync_playwright
 
-        os.makedirs(self.user_data_dir, exist_ok=True)
-        _platform_os = {"Darwin": "macos", "Windows": "windows", "Linux": "linux"}.get(
-            platform.system(), "macos"
-        )
-        launch_kw = dict(
-            persistent_context=True,
-            user_data_dir=self.user_data_dir,
-            headless=self.headless,
-            os=_platform_os,
-            locale="zh-CN,zh,en-US",
-            user_agent=self.user_agent,
-            viewport=None,
-            window=_detect_screen_size(),
-            color_scheme="light",
-            fonts=[
-                "PingFang SC",
-                "Hiragino Sans GB",
-                "Helvetica Neue",
-                "Arial",
-            ],
-            config={
-                "fonts:spacing_seed": 0,
-                "disableTheming": True,
-            },
-            executable_path=camoufox_exe,
+        if self._playwright is None:
+            self._playwright = sync_playwright().start()
+
+        self.browser = self._playwright.chromium.connect_over_cdp(
+            "ws://127.0.0.1:9222/devtools/browser"
         )
 
-        _diag(f"Launching Camoufox with headless={self.headless}, os={_platform_os}")
-        self._camoufox = Camoufox(**launch_kw)
-        raw_context = self._camoufox.__enter__()
-        self.context = _FirefoxContextWrapper(raw_context)
-        _diag("Camoufox started successfully")
-
+        self.context = self.browser.contexts[0] if self.browser.contexts else self.browser.new_context()
+        self.page = self.context.pages[0] if self.context.pages else self.context.new_page()
         return self.context
 
     def close_tabs(self, keyword: str):
@@ -255,12 +55,7 @@ class PlaywrightBrowserManager:
             except Exception:
                 pass
             self.context = None
-        if self._camoufox:
-            try:
-                self._camoufox.__exit__(None, None, None)
-            except Exception:
-                pass
-            self._camoufox = None
+
 
     def __enter__(self):
         self.start()

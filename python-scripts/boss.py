@@ -45,12 +45,6 @@ class BossCrawler:
             self.awaken_list_request(response.json())
 
     def login(self):
-        # 先打开主站，否则 request 无站点 cookie，易被风控或返回空/HTML，json() 会抛错
-        self.page.goto(
-            "https://www.zhipin.com/",
-            wait_until="domcontentloaded",
-            timeout=60000,
-        )
         login_response = self.page.request.get(
             "https://www.zhipin.com/wapi/hunter/h5/hunterManage/checkAuth"
         )

@@ -86,8 +86,7 @@ class LiepinResumeCrawler:
         if mopin_login_data.get('msg') != "成功":
             self.page.goto("https://mopin.58.com/login")
             self.page.locator('//span[contains(text(),"做单")]').first.wait_for(state='visible',timeout=60000)
-        mopin_cookie = local_utils.get_cookie_string(self.context)
-
+        mopin_cookie = mopin_login_response.headers.get('set-cookie')
         # 判断liepin直聘是否登陆了
         time.sleep(random.uniform(1, 2))
         login_response=self.page.request.post("https://api-lpt.liepin.com/api/com.liepin.future.common.access")

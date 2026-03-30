@@ -79,16 +79,13 @@ class BossCrawler:
             print(f"参数错误: days 必须为正整数，当前值: {raw_days!r}")
             return
 
-        # 判断mopin 是否登陆了 是否正常
-        time.sleep(random.uniform(1, 3))
         mopin_login_response=self.page.request.get("https://mopinapi.58.com/account/currentInfo")
         mopin_login_data=mopin_login_response.json()
         if mopin_login_data.get('msg') != "成功":
             self.page.goto("https://mopin.58.com/login")
             self.page.locator('//span[contains(text(),"做单")]').first.wait_for(state='visible',timeout=60000)
-        mopin_cookie = local_utils.get_cookie_string(self.context)
-        # 判断boss直聘是否登陆了
-        time.sleep(random.uniform(1, 3))
+        mopin_cookie = mopin_login_response.headers.get('set-cookie')
+
         login_response=self.page.request.get("https://www.zhipin.com/wapi/hunter/h5/hunterManage/checkAuth")
         login_data=login_response.json()
         if login_data.get('message') != "Success":
@@ -104,12 +101,9 @@ class BossCrawler:
         if self.stopped:
             return
 
-
-
-
-        self.page.goto("https://www.zhipin.com/web/chat/index")
+        self.page.goto("https://www.zhipin.com/web/chat/index",wait_until="domcontentloaded",timeout=60000)
         self.page.locator('//span[contains(text(),"已获取简历")]').click()
-        if self.sleep_with_stop(10):
+        if self.sleep_with_stop(5):
             return
         next_element=self.page.locator('//div[@role="listitem" and @key]').first
 
@@ -165,7 +159,7 @@ class BossCrawler:
                     continue
                 clearn_pdf_data=parse_request.pdf_parse_request(binary_data)
                 awaken_response['cookie']=mopin_cookie
-                awaken_response['clean_pdf_data']=clearn_pdf_data 
+                # awaken_response['clean_pdf_data']=clearn_pdf_data 
                 awaken_response['cleaned']['boss']['data']['baseInfo']['name']=clearn_pdf_data['data']['baseInfo']['name'] or ''
                 awaken_response['cleaned']['boss']['data']['baseInfo']['nickName']=clearn_pdf_data['data']['baseInfo']['name'] or ''
                 awaken_response['cleaned']['boss']['data']['baseInfo']['emailBlur']=clearn_pdf_data['data']['baseInfo']['email'] or ''

@@ -126,7 +126,7 @@ fn packaged_python_scripts_dir(resource_dir: &Path) -> std::path::PathBuf {
 }
 
 /// 从资源管理器启动的 GUI 进程在 Windows 上可能缺少 USERPROFILE/LOCALAPPDATA，
-/// 与 Python 侧 playwright_runner 的环境补全配合，供 camoufox 写入用户缓存。
+/// 与 Python 脚本使用用户目录（缓存、配置等）时保持一致。
 fn apply_gui_python_env(cmd: &mut Command) {
     #[cfg(windows)]
     {
@@ -231,8 +231,8 @@ async fn run_wake_script(
         return Err(format!("Python not found: {:?}", python_exe));
     }
 
-    // 不设置 PLAYWRIGHT_BROWSERS_PATH 指向包内目录：Camoufox 二进制由首次运行
-    // `python -m camoufox fetch` 下载到用户缓存（camoufox/pkgman），不应打进安装包。
+    // 不设置 PLAYWRIGHT_BROWSERS_PATH：运行时直接使用安装包内随附的 Camoufox 目录，
+    // 不依赖首次下载，也不落地到用户缓存。
     let mut cmd = Command::new(&python_exe);
     cmd.arg("-u")
         .arg(&script_path)
