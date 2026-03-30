@@ -1,3 +1,3 @@
-# PyPI 上 Python 仅有 playwright 整包（无独立 playwright-core 包；与 Node 不同）
+# PyPI ships only the full playwright package for Python (no separate playwright-core wheel like npm).
 playwright==1.49.1
 requests==2.32.3

@@ -144,6 +144,8 @@ jobs:
         if: matrix.platform == 'windows-latest'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          # pip on Windows defaults to cp1252 for requirements.txt; UTF-8 comments need this
+          PYTHONUTF8: "1"
         run: |
           cd python-scripts
           curl -L https://github.com/indygreg/python-build-standalone/releases/download/20241016/cpython-3.12.7+20241016-x86_64-pc-windows-msvc-shared-install_only_stripped.tar.gz -o python.tar.gz
