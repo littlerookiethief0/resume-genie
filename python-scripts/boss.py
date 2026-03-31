@@ -81,25 +81,28 @@ class BossCrawler:
             except Exception as e:
                 print(f"处理失败: {e}")
                 continue
-    
+
+
+    def scroll_load_bottom(self):
+        self.page.evaluate("window.scrollTo({top:document.documentElement.scrollHeight, behavior:'smooth'})")
+        time.sleep(random.uniform(0.2, 0.5))
+        self.page.locator('//p[text()="点击加载更多"]').click()
+
+
     def run(self):
         # 监听网络响应
         self.page.on("response", self.monitor_awake_response)
         # 判断是否登陆成功，如果未登陆，则跳转登陆页面
         self.login()
         time.sleep(5)
-        self.page.goto("https://www.zhipin.com/web/chat/search")
+        self.page.goto("https://www.zhipin.com/web/frame/search/?jobId=&keywords=&t=&source=&city=")
         self.on_step(2)  
         # 等待第二页加载出来，说明条件筛选完成
         contion_response=local_utils.wait_for_condition(self.page,lambda:self.page_params.get('page')=='2')
         if not contion_response:
             return '设置条件超过6分钟，终止脚本执行'
         self.on_step(3)  
-
-        iframe=self.page.frame_locator('//iframe[@name="searchFrame"]')
-        # 缓慢滚动，逐渐滚动到最下边
-        scroll_func=lambda:iframe.locator('//p[text()="点击加载更多"]').scroll_into_view_if_needed()
-        scroll_flag=local_utils.scroll_load_bottom(scroll_func)
+        scroll_flag=local_utils.scroll_load_bottom(lambda:self.scroll_load_bottom())
         print(scroll_flag)
 
 
