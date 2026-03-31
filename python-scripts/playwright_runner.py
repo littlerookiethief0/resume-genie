@@ -5,7 +5,7 @@ import struct
 import subprocess
 import sys
 from pathlib import Path
-from playwright.sync_api import Browser, BrowserContext, Page
+from patchright.async_api import Browser, BrowserContext, Page
 
 try:
     from .local_utils import get_data_path
@@ -22,8 +22,7 @@ class PlaywrightBrowserManager:
         self._playwright = None
 
     def start(self):
-
-        from playwright.sync_api import sync_playwright
+        from patchright.sync_api import sync_playwright   # 注意：用 patchright 的 import
 
         if self._playwright is None:
             self._playwright = sync_playwright().start()
