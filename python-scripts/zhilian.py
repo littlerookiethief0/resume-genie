@@ -2,7 +2,7 @@ import time
 import threading
 from typing import Any, Callable, Optional
 import re
-from playwright.sync_api import BrowserContext, Page
+from patchright.sync_api import BrowserContext, Page
 import mopin_request
 import parse_request
 import json

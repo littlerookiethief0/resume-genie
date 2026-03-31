@@ -2,7 +2,7 @@ import time
 import threading
 from typing import Any, Callable, Optional
 import random
-from playwright.sync_api import BrowserContext, Page
+from patchright.sync_api import BrowserContext, Page
 import os, json
 
 # 作为包使用时用相对导入；直接 python scripts/boss.py 时用绝对导入

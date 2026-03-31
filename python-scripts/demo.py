@@ -14,7 +14,7 @@ if __name__ == "__main__":
     if _dir not in sys.path:
         sys.path.insert(0, _dir)
 
-from playwright.sync_api import sync_playwright
+from patchright.sync_api import sync_playwright
 from local_utils import get_data_path
 
 with sync_playwright() as p:

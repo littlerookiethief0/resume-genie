@@ -1,3 +1,3 @@
-# PyPI ships only the full playwright package for Python (no separate playwright-core wheel like npm).
-playwright==1.49.1
+# Patchright：与 Playwright API 兼容的 Chromium 自动化（降低自动化特征；见 patchright 文档）。
+patchright==1.49.1
 requests==2.32.3
