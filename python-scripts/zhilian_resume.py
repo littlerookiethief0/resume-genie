@@ -9,12 +9,16 @@ import base64
 # 作为包使用时用相对导入；直接 python scripts/boss.py 时用绝对导入
 try:
     from . import local_utils, parse_request, mopin_request
+    from .app_logger import emit_resume_data, get_logger
     from .playwright_runner import PlaywrightBrowserManager
 except ImportError:
     import local_utils
     import parse_request
     import mopin_request
+    from app_logger import emit_resume_data, get_logger
     from playwright_runner import PlaywrightBrowserManager
+
+_log = get_logger(__name__)
 
 
 class ZhilianResumeCrawler:
@@ -29,7 +33,7 @@ class ZhilianResumeCrawler:
         self.config: dict[str, Any] = kwargs
         self.stop_event: Optional[threading.Event] = stop_event
         self.on_step = on_step or (lambda step: None)
-        self.on_data = on_data or (lambda data: print(f"RESUME_DATA:{json.dumps(data, ensure_ascii=False)}", flush=True))
+        self.on_data = on_data or emit_resume_data
         self.browser_manager: PlaywrightBrowserManager = PlaywrightBrowserManager()
         self.context: BrowserContext = self.browser_manager.start()
         self.browser_manager.close_tabs("liepin")
@@ -83,7 +87,7 @@ class ZhilianResumeCrawler:
             if days <= 0:
                 raise ValueError
         except (TypeError, ValueError):
-            print(f"参数错误: days 必须为正整数，当前值: {raw_days!r}")
+            _log.error("参数错误: days 必须为正整数，当前值: %r", raw_days)
             return
 
         # 判断mopin 是否登陆了 是否正常
@@ -117,7 +121,7 @@ class ZhilianResumeCrawler:
                 save_path=os.path.join(local_utils.get_data_path("zhilian_resume"), f"{name}_{uid}_{job_title}.pdf")
                 os.makedirs(local_utils.get_data_path("zhilian_resume"), exist_ok=True)
                 if os.path.exists(save_path):
-                    print(f"文件已存在,跳过下载: {save_path}")
+                    _log.info("文件已存在,跳过下载: %s", save_path)
                     continue
                 img=person['avatar'].split('avatar')[-1]
                 xpath=f'//img[contains(@src,"{img}")]/../../../..//span[@title="{name}"]'
@@ -127,14 +131,14 @@ class ZhilianResumeCrawler:
                 awaken_request_response=mopin_request.awaken_request(awaken_parse_response)['data']
                 wake_resume_dict = json.loads(awaken_request_response['wakeResume'])
                 if wake_resume_dict['msg']=='成功':
-                    print(f"唤醒成功: {name}_{uid}_{job_title}")
+                    _log.info("唤醒成功: %s_%s_%s", name, uid, job_title)
                 else:
-                    print(f"唤醒失败: {name}_{uid}_{job_title}")
+                    _log.info("唤醒失败: %s_%s_%s", name, uid, job_title)
                 
                 try:
                     self.page.locator('//span[text()="查看附件简历"]').wait_for(state='visible',timeout=10000)
                 except Exception as e:
-                    print(f"处理失败: {e}")
+                    _log.exception("处理失败")
                     continue
                 click_download = lambda:self.page.locator('//span[text()="查看附件简历"]').click()
                 download_response=self.browser_manager.action_and_capture(self.page, click_download, 'api/resume/getAttachResumeInfo')
@@ -142,7 +146,7 @@ class ZhilianResumeCrawler:
                 response=self.context.request.get(download_url)
                 with open(save_path, 'wb') as f:
                     f.write(response.body())
-                print(f"下载成功: {name}_{uid}_{job_title}")
+                _log.info("下载成功: %s_%s_%s", name, uid, job_title)
                 pdf_parse_data = parse_request.pdf_parse_request(response.body())
                 parse_data = awaken_parse_response  # 先用唤醒后的数据作为推送基准
                 # 补充pdf解析后的信息
@@ -160,11 +164,11 @@ class ZhilianResumeCrawler:
                 name = parse_data['cleaned']['zhilian']['data']['baseInfo']['name']
                 push_response = mopin_request.push_request(parse_data)
                 if json.loads(push_response['data']['createOrUpdateResume']).get('msg') == '成功':
-                    print(f"简历推送保存成功: {name}")
+                    _log.info("简历推送保存成功: %s", name)
                     self.on_data({'name': name or '', 'phone': iphone or ''})
                 else:
-                    print(f"简历推送保存失败: {name}")
-                print(pdf_parse_data)
+                    _log.warning("简历推送保存失败: %s", name)
+                _log.debug("pdf_parse_data: %s", pdf_parse_data)
 
                 self.browser_manager.close_tabs("attachment.zhaopin.com/resumeapi/parsev2/downloadFileTemporary?file")
                 time.sleep(random.uniform(1, 2))
@@ -183,7 +187,7 @@ class ZhilianResumeCrawler:
         try:
             self.run()
         finally:
-            print('finally')
+            _log.debug("finally")
             self.page.close()
             self.browser_manager.disconnect()
 

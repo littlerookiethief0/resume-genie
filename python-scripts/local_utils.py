@@ -7,6 +7,13 @@ import random
 from datetime import datetime, timedelta
 from urllib.parse import urlparse, parse_qs
 
+try:
+    from .app_logger import get_logger
+except ImportError:
+    from app_logger import get_logger
+
+_log = get_logger(__name__)
+
 
 def get_data_path(*names):
     """
@@ -152,7 +159,7 @@ def wait_for_condition(page, check_func, timeout_ms=600000):
             return True
             
         if time.time() - start_time > timeout_sec:
-            print("⏰ 等待超时")
+            _log.warning("⏰ 等待超时")
             return False
             
         page.wait_for_timeout(200) 

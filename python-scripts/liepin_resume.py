@@ -8,12 +8,16 @@ import os, json
 # 作为包使用时用相对导入；直接 python scripts/boss.py 时用绝对导入
 try:
     from . import local_utils, parse_request, mopin_request
+    from .app_logger import emit_resume_data, get_logger
     from .playwright_runner import PlaywrightBrowserManager
 except ImportError:
     import local_utils
     import parse_request
     import mopin_request
+    from app_logger import emit_resume_data, get_logger
     from playwright_runner import PlaywrightBrowserManager
+
+_log = get_logger(__name__)
 
 
 class LiepinResumeCrawler:
@@ -28,7 +32,7 @@ class LiepinResumeCrawler:
         self.config: dict[str, Any] = kwargs
         self.stop_event: Optional[threading.Event] = stop_event
         self.on_step = on_step or (lambda step: None)
-        self.on_data = on_data or (lambda data: print(f"RESUME_DATA:{json.dumps(data, ensure_ascii=False)}", flush=True))
+        self.on_data = on_data or emit_resume_data
         self.browser_manager: PlaywrightBrowserManager = PlaywrightBrowserManager()
         self.context: BrowserContext = self.browser_manager.start()
         self.browser_manager.close_tabs("liepin")
@@ -76,7 +80,7 @@ class LiepinResumeCrawler:
             if days <= 0:
                 raise ValueError
         except (TypeError, ValueError):
-            print(f"参数错误: days 必须为正整数，当前值: {raw_days!r}")
+            _log.error("参数错误: days 必须为正整数，当前值: %r", raw_days)
             return
 
         # 判断mopin 是否登陆了 是否正常
@@ -117,7 +121,7 @@ class LiepinResumeCrawler:
            
             # 超过某个时间就终止
             if not local_utils.is_in_past_days(time_timestamp, days=days):
-                print(f"超过某个时间就终止")
+                _log.info("超过某个时间就终止")
                 break
             # ui点击停止
             if self.stopped:
@@ -150,7 +154,7 @@ class LiepinResumeCrawler:
                     f"{resume_detail_response['resumeDetailed']['baseInfo']['name']}_{resume_detail_response['extInfoDto']['usercId']}.pdf"
                 )
                 if os.path.exists(save_path):
-                    print(f"文件已存在,跳过下载: {save_path}")
+                    _log.info("文件已存在,跳过下载: %s", save_path)
                     self.page.locator('//span[@class="antlpticon antlpticon-close"]').last.click()
                     next_element = next_element.locator('xpath=./following-sibling::div[1]')
                     continue
@@ -165,7 +169,7 @@ class LiepinResumeCrawler:
 
                     basic_info = parse_request.pdf_parse_request_basic(binary_data)
                     if not basic_info['data']['mobile']:
-                        print(f"手机号不存在,跳过下载: {save_path}")
+                        _log.info("手机号不存在,跳过下载: %s", save_path)
                         self.page.locator('//span[@class="antlpticon antlpticon-close"]').last.click()
                         next_element = next_element.locator('xpath=./following-sibling::div[1]')
                         continue
@@ -183,14 +187,14 @@ class LiepinResumeCrawler:
                     name = parse_data['cleaned']['liepin']['data']['baseInfo']['name']
                     push_response = mopin_request.push_request(parse_data)
                     if json.loads(push_response['data']['createOrUpdateResume']).get('msg') == '成功':
-                        print(f"简历推送保存成功: {name}")
+                        _log.info("简历推送保存成功: %s", name)
                         self.on_data({'name': name or '', 'phone': iphone or ''})
                     else:
-                        print(f"简历推送保存失败: {name}")
+                        _log.warning("简历推送保存失败: %s", name)
                     self.page.locator('//span[@class="antlpticon antlpticon-close"]').last.click()
                 next_element = next_element.locator('xpath=./following-sibling::div[1]')
             except Exception as e:
-                print(f"猎聘处理失败: {e}")
+                _log.exception("猎聘处理失败")
                 try:
                     close_btn = self.page.locator('//span[@class="antlpticon antlpticon-close"]').last
                     if close_btn.is_visible():
@@ -200,7 +204,7 @@ class LiepinResumeCrawler:
                 next_element = next_element.locator('xpath=./following-sibling::div[1]')
                 continue
         if self.stopped:
-            print("收到停止信号，结束猎聘解析任务")
+            _log.info("收到停止信号，结束猎聘解析任务")
 
 
 
@@ -279,7 +283,7 @@ class LiepinResumeCrawler:
         try:
             self.run()
         finally:
-            print('finally')
+            _log.debug("finally")
             self.page.close()
             self.browser_manager.disconnect()
 

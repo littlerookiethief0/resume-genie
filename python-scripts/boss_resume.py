@@ -8,12 +8,16 @@ import os, json
 # 作为包使用时用相对导入；直接 python scripts/boss.py 时用绝对导入
 try:
     from . import local_utils, parse_request, mopin_request
+    from .app_logger import emit_resume_data, get_logger
     from .playwright_runner import PlaywrightBrowserManager
 except ImportError:
     import local_utils
     import parse_request
     import mopin_request
+    from app_logger import emit_resume_data, get_logger
     from playwright_runner import PlaywrightBrowserManager
+
+_log = get_logger(__name__)
 
 
 class BossCrawler:
@@ -28,7 +32,7 @@ class BossCrawler:
         self.config: dict[str, Any] = kwargs
         self.stop_event: Optional[threading.Event] = stop_event
         self.on_step = on_step or (lambda step: None)
-        self.on_data = on_data or (lambda data: print(f"RESUME_DATA:{json.dumps(data, ensure_ascii=False)}", flush=True))
+        self.on_data = on_data or emit_resume_data
         self.browser_manager: PlaywrightBrowserManager = PlaywrightBrowserManager()
         self.context: BrowserContext = self.browser_manager.start()
         self.browser_manager.close_tabs("zhipin")
@@ -76,7 +80,7 @@ class BossCrawler:
             if days <= 0:
                 raise ValueError
         except (TypeError, ValueError):
-            print(f"参数错误: days 必须为正整数，当前值: {raw_days!r}")
+            _log.error("参数错误: days 必须为正整数，当前值: %r", raw_days)
             return
 
         mopin_login_response=self.page.request.get("https://mopinapi.58.com/account/currentInfo")
@@ -113,14 +117,14 @@ class BossCrawler:
                 break
             current_key = next_element.get_attribute('key')
             if not current_key:
-                print("当前简历项缺少 key，终止任务")
+                _log.warning("当前简历项缺少 key，终止任务")
                 break
 
             try:
                 time_text=next_element.locator('span.time.time-shadow').text_content().strip()
                 time_timestamp=local_utils.date_str_to_timestamp(time_text)
             except Exception as e:
-                print(f"时间解析失败, 跳过该条: key={current_key}, error={e}")
+                _log.warning("时间解析失败, 跳过该条: key=%s, error=%s", current_key, e)
                 next_element = self.page.locator(
                     f'//div[@role="listitem" and @key="{current_key}"]/following-sibling::div[1]'
                 )
@@ -142,7 +146,7 @@ class BossCrawler:
             resume_element=self.page.locator('//a[@class="btn resume-btn-file"]')
             save_path = os.path.join(local_utils.get_data_path("boss_resume"), f"{awaken_response['cleaned']['boss']['data']['baseInfo']['name']}_{next_uid}.pdf")
             if os.path.exists(save_path):
-                print(f"文件已存在,跳过下载: {save_path}")
+                _log.info("文件已存在,跳过下载: %s", save_path)
                 continue
             time.sleep(random.uniform(1, 3))
             if resume_element.is_visible():
@@ -154,7 +158,7 @@ class BossCrawler:
 
                 basic_info=parse_request.pdf_parse_request_basic(binary_data)
                 if not basic_info['data']['mobile']:
-                    print(f"手机号不存在,跳过下载: {save_path}")
+                    _log.info("手机号不存在,跳过下载: %s", save_path)
                     self.page.locator('//div[@class="boss-popup__close"]').click()
                     continue
                 clearn_pdf_data=parse_request.pdf_parse_request(binary_data)
@@ -171,21 +175,21 @@ class BossCrawler:
                 name=awaken_response['cleaned']['boss']['data']['baseInfo']['name']
                 push_response=mopin_request.push_request(awaken_response)
                 if json.loads(push_response['data']['createOrUpdateResume']).get('msg') == '成功':
-                    print(f"简历推送保存成功: {name}-{iphone}")
+                    _log.info("简历推送保存成功: %s-%s", name, iphone)
                     self.on_data({'name': name or '', 'phone': iphone or ''})
                 else:
-                    print(f"简历推送保存失败: {name}")
+                    _log.warning("简历推送保存失败: %s", name)
                 self.page.locator('//div[@class="boss-popup__close"]').click()
 
         if self.stopped:
-            print("收到停止信号，结束 Boss 解析任务")
+            _log.info("收到停止信号，结束 Boss 解析任务")
 
            
     def start(self):
         try:
             self.run()
         finally:
-            print('finally')
+            _log.debug("finally")
             self.page.close()
             self.browser_manager.disconnect()
 

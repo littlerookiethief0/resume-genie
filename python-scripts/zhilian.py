@@ -11,9 +11,13 @@ import random
 import local_utils
 # 作为包使用时用相对导入；直接 python scripts/boss.py 时用绝对导入
 try:
+    from .app_logger import emit_step, get_logger
     from .playwright_runner import PlaywrightBrowserManager
 except ImportError:
+    from app_logger import emit_step, get_logger
     from playwright_runner import PlaywrightBrowserManager
+
+_log = get_logger(__name__)
 
 
 class ZhilianCrawler:
@@ -26,7 +30,7 @@ class ZhilianCrawler:
         """kwargs 为前端 run_script('boss', { ... }) 传来的参数，可按需使用。"""
         self.config: dict[str, Any] = kwargs
         self.stop_event: Optional[threading.Event] = stop_event
-        self.on_step = on_step or (lambda step: print(f"STEP:{step}", flush=True))
+        self.on_step = on_step or emit_step
         self.browser_manager: PlaywrightBrowserManager = PlaywrightBrowserManager()
         self.context: BrowserContext = self.browser_manager.start()
         self.browser_manager.close_tabs("zhaopin")
@@ -60,11 +64,11 @@ class ZhilianCrawler:
                 mopin_data=mopin_request.awaken_request(parse_data)
                 wake_resume_dict = json.loads(mopin_data['data']['wakeResume'])
                 if wake_resume_dict['msg']=='成功':
-                    print(f"唤醒成功: {person['userName']}")
+                    _log.info("唤醒成功: %s", person['userName'])
                 else:
-                    print(f"唤醒失败: {person['userName']}")
+                    _log.info("唤醒失败: %s", person['userName'])
             except Exception as e:
-                print(f"处理失败: {e}")
+                _log.exception("处理失败")
                 continue
     
     def run(self):
@@ -84,7 +88,7 @@ class ZhilianCrawler:
 
         scroll_func=lambda:self.page.locator('//a[not(@disabled)]//i[@class="km-icon sati sati-angle-right"]').click()
         scroll_flag=local_utils.scroll_load_bottom(scroll_func)
-        print(scroll_flag)
+        _log.info("scroll_load_bottom: %s", scroll_flag)
 
 
 
@@ -92,7 +96,7 @@ class ZhilianCrawler:
         try:
             self.run()
         finally:
-            print('finally')
+            _log.debug("finally")
             self.page.close()
             self.browser_manager.disconnect()
 
