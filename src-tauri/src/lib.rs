@@ -58,7 +58,7 @@ async fn verify_mobile_account(mobile: String) -> Result<Value, String> {
 async fn check_version(current_version: String) -> Result<Value, String> {
     let client = reqwest::Client::new();
     let url = format!(
-        "https://jobdig.100dp.com/api/version/check?currentVersion={}",
+        "https://jobdig.100dp.com/api/version/checkAssistant?currentVersion={}",
         current_version
     );
     let resp = client
