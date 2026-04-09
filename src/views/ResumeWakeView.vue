@@ -66,19 +66,6 @@ function getStatusColor(status: string) {
   }
 }
 
-function getMaxPagesText(site: any) {
-  const max = Number(site.maxPages || 5)
-  if (site.status === 'running') {
-    const cur = Number(site.page || 1)
-    return `第 ${cur} / ${max} 页`
-  }
-  return ''
-}
-
-function getMaxPagesColor(site: any) {
-  return getStatusColor(site.status)
-}
-
 const activeStep = ref(0)
 
 let unlistenFinished: (() => void) | undefined
@@ -201,9 +188,6 @@ async function handleAction(site: any) {
             controls-position="right"
             :disabled="site.status === 'running'"
           />
-          <span v-if="getMaxPagesText(site)" class="site-page-text" :style="{ color: getMaxPagesColor(site) }">
-            {{ getMaxPagesText(site) }}
-          </span>
         </span>
         <div class="action">
           <el-button link type="primary" @click="handleAction(site)">
@@ -342,12 +326,6 @@ async function handleAction(site: any) {
 
 .site-maxpages-input {
   width: 120px;
-}
-
-.site-page-text {
-  font-size: 13px;
-  flex: 1;
-  min-width: 0;
 }
 
 .site-info {
