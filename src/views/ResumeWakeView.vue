@@ -11,24 +11,32 @@ const sites = ref([
     name: 'BOSS直聘',
     logo: new URL('../assets/boss.png', import.meta.url).href,
     status: 'idle',
+    page: 0,
+    maxPages: 100,
   },
   {
     id: 'liepin',
     name: '猎聘',
     logo: new URL('../assets/liepin.png', import.meta.url).href,
     status: 'idle',
+    page: 0,
+    maxPages: 100,
   },
   {
     id: 'zhilian',
     name: '智联招聘',
     logo: new URL('../assets/zhilian.png', import.meta.url).href,
     status: 'idle',
+    page: 0,
+    maxPages: 100,
   },
   {
     id: 'qiancheng',
     name: '前程无忧',
     logo: new URL('../assets/qcwy.png', import.meta.url).href,
     status: 'idle',
+    page: 0,
+    maxPages: 100,
   }
 ])
 
@@ -58,10 +66,24 @@ function getStatusColor(status: string) {
   }
 }
 
+function getMaxPagesText(site: any) {
+  const max = Number(site.maxPages || 5)
+  if (site.status === 'running') {
+    const cur = Number(site.page || 1)
+    return `第 ${cur} / ${max} 页`
+  }
+  return ''
+}
+
+function getMaxPagesColor(site: any) {
+  return getStatusColor(site.status)
+}
+
 const activeStep = ref(0)
 
 let unlistenFinished: (() => void) | undefined
 let unlistenStep: (() => void) | undefined
+let unlistenPage: (() => void) | undefined
 
 onMounted(async () => {
   unlistenFinished = await listen<[string, boolean, number | null]>('wake_script_finished', (event) => {
@@ -69,6 +91,7 @@ onMounted(async () => {
     const site = getSiteById(siteId)
     if (!site) return
     site.status = 'idle'
+    site.page = 0
     activeStep.value = 0
     if (code === -1) {
       ElMessage.warning(`${site.name} 已停止唤醒`)
@@ -84,11 +107,19 @@ onMounted(async () => {
     const [, step] = event.payload
     activeStep.value = step
   })
+
+  unlistenPage = await listen<[string, number]>('wake_page', (event) => {
+    const [siteId, page] = event.payload
+    const site = getSiteById(siteId)
+    if (!site) return
+    site.page = page
+  })
 })
 
 onUnmounted(() => {
   unlistenFinished?.()
   unlistenStep?.()
+  unlistenPage?.()
 })
 
 async function handleAction(site: any) {
@@ -104,6 +135,7 @@ async function handleAction(site: any) {
 
   site.status = 'running'
   activeStep.value = 0
+  site.page = 0
   ElMessage.info(`开始唤醒 ${site.name}`)
 
   try {
@@ -111,6 +143,7 @@ async function handleAction(site: any) {
       siteId: site.id,
       days: 7,
       autoParse: loadAutoParseAfterWake(),
+      wakeMaxPages: site.maxPages || 5,
     })
   } catch (error) {
     site.status = 'idle'
@@ -145,6 +178,7 @@ async function handleAction(site: any) {
       <div class="list-header">
         <span>网站</span>
         <span>唤醒状态</span>
+        <span class="header-config">最大页数</span>
         <span class="header-action">操作</span>
       </div>
 
@@ -155,6 +189,21 @@ async function handleAction(site: any) {
         </div>
         <span class="site-status" :style="{ color: getStatusColor(site.status) }">
           {{ getStatusText(site.status) }}
+        </span>
+        <span class="site-page">
+          <el-input-number
+            v-model="site.maxPages"
+            class="site-maxpages-input"
+            :min="1"
+            :max="500"
+            :step="1"
+            size="small"
+            controls-position="right"
+            :disabled="site.status === 'running'"
+          />
+          <span v-if="getMaxPagesText(site)" class="site-page-text" :style="{ color: getMaxPagesColor(site) }">
+            {{ getMaxPagesText(site) }}
+          </span>
         </span>
         <div class="action">
           <el-button link type="primary" @click="handleAction(site)">
@@ -187,6 +236,17 @@ async function handleAction(site: any) {
   margin: 0 0 12px;
 }
 
+.config-label {
+  font-size: 13px;
+  color: #999;
+  font-weight: 400;
+}
+
+.config-hint {
+  font-size: 12px;
+  color: #999;
+}
+
 .warning-bar {
   background: #fffbe6;
   border: 1px solid #ffe58f;
@@ -213,20 +273,26 @@ async function handleAction(site: any) {
 
 .list-header {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: 1.1fr 1fr 320px 90px;
   padding: 12px 24px;
   font-size: 13px;
   color: #999;
   border-bottom: 1px solid #f0f0f0;
 }
 
+.header-config {
+  text-align: left;
+  white-space: nowrap;
+}
+
 .header-action {
+  min-width: 56px;
   text-align: right;
 }
 
 .site-row {
   display: grid;
-  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-columns: 1.1fr 1fr 320px 90px;
   padding: 16px 24px;
   align-items: center;
   border-bottom: 1px solid #f5f5f5;
@@ -260,6 +326,28 @@ async function handleAction(site: any) {
 .site-status {
   font-size: 14px;
   font-weight: 500;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.site-page {
+  display: inline-flex;
+  justify-content: flex-start;
+  align-items: center;
+  white-space: nowrap;
+  gap: 10px;
+  width: 100%;
+}
+
+.site-maxpages-input {
+  width: 120px;
+}
+
+.site-page-text {
+  font-size: 13px;
+  flex: 1;
+  min-width: 0;
 }
 
 .site-info {

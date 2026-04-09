@@ -14,6 +14,10 @@ except ImportError:
 
 _log = get_logger(__name__)
 
+# 全局配置：唤醒脚本翻页/滚动的最大次数（所有脚本共用）
+# 可通过环境变量覆盖（由前端/启动器注入），不传则默认 100
+WAKE_SCROLL_MAX_TIMES = int(os.getenv("WAKE_SCROLL_MAX_TIMES", "100"))
+
 
 def get_data_path(*names):
     """
@@ -165,10 +169,22 @@ def wait_for_condition(page, check_func, timeout_ms=600000):
         page.wait_for_timeout(200) 
 
 
-def scroll_load_bottom(func,timeout_ms=3600000):
+def scroll_load_bottom(func,timeout_ms=3600000,max_times=101):
     start_time = time.time()
     timeout_sec = timeout_ms / 1000.0  # 👈 转换为秒
-    while True:
+    # while True:
+    #     try:
+    #         # 随机延时，模拟人类阅读和思考时间
+    #         time.sleep(random.uniform(2, 5))
+    #         func()
+    #         # 操作后再随机停留
+    #         time.sleep(random.uniform(1, 3))
+    #     except Exception as e:
+    #         return 'finish'
+    #     finally:
+    #         if time.time() - start_time > timeout_sec:
+    #             return 'timeout'
+    for page_index in range(2,max_times):
         try:
             # 随机延时，模拟人类阅读和思考时间
             time.sleep(random.uniform(2, 5))

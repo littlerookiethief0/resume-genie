@@ -29,6 +29,12 @@ class ZhilianCrawler:
     ):
         """kwargs 为前端 run_script('boss', { ... }) 传来的参数，可按需使用。"""
         self.config: dict[str, Any] = kwargs
+        # 前端可传 wakeMaxPages / max_times，统一落到 self.max_times
+        self.max_times: int = int(
+            self.config.get("wakeMaxPages")
+            or self.config.get("max_times")
+            or local_utils.WAKE_SCROLL_MAX_TIMES
+        )
         self.stop_event: Optional[threading.Event] = stop_event
         self.on_step = on_step or emit_step
         self.browser_manager: PlaywrightBrowserManager = PlaywrightBrowserManager()
@@ -87,7 +93,7 @@ class ZhilianCrawler:
         self.on_step(3)  
 
         scroll_func=lambda:self.page.locator('//a[not(@disabled)]//i[@class="km-icon sati sati-angle-right"]').click()
-        scroll_flag=local_utils.scroll_load_bottom(scroll_func)
+        scroll_flag=local_utils.scroll_load_bottom(scroll_func,max_times=self.max_times)
         _log.info("scroll_load_bottom: %s", scroll_flag)
 
 

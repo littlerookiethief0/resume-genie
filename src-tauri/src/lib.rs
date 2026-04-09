@@ -101,13 +101,11 @@ fn spawn_stderr_reader(stderr: std::process::ChildStderr, app: AppHandle, label:
         use std::io::Write;
         let mut log_file = get_log_file();
         let reader = BufReader::new(stderr);
-        for line in reader.lines() {
-            if let Ok(line) = line {
-                eprintln!("[{}] {}", label, line);
-                let _ = app.emit("script_stderr", (&label, &line));
-                if let Some(ref mut f) = log_file {
-                    let _ = writeln!(f, "[{}] {}", label, line);
-                }
+        for line in reader.lines().flatten() {
+            eprintln!("[{}] {}", label, line);
+            let _ = app.emit("script_stderr", (&label, &line));
+            if let Some(ref mut f) = log_file {
+                let _ = writeln!(f, "[{}] {}", label, line);
             }
         }
     });
@@ -182,6 +180,7 @@ async fn run_wake_script(
     site_id: String,
     days: i32,
     auto_parse: bool,
+    wake_max_pages: Option<i32>,
 ) -> Result<String, String> {
     // 获取资源目录路径
     let resource_dir = app.path()
@@ -240,6 +239,11 @@ async fn run_wake_script(
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .env("PYTHONUTF8", "1");
+    if let Some(p) = wake_max_pages {
+        if p > 0 {
+            cmd.env("WAKE_SCROLL_MAX_TIMES", p.to_string());
+        }
+    }
     apply_gui_python_env(&mut cmd);
 
     // Windows: 隐藏控制台窗口
@@ -260,15 +264,17 @@ async fn run_wake_script(
     if let Some(stdout) = stdout {
         thread::spawn(move || {
             let reader = BufReader::new(stdout);
-            for line in reader.lines() {
-                if let Ok(line) = line {
-                    if let Some(step_str) = line.strip_prefix("STEP:") {
-                        if let Ok(step) = step_str.trim().parse::<i32>() {
-                            let _ = app_stdout.emit("wake_step", (site_id_stdout.clone(), step));
-                        }
-                    } else {
-                        eprintln!("[wake:{}] {}", site_id_stdout, line);
+            for line in reader.lines().flatten() {
+                if let Some(step_str) = line.strip_prefix("STEP:") {
+                    if let Ok(step) = step_str.trim().parse::<i32>() {
+                        let _ = app_stdout.emit("wake_step", (site_id_stdout.clone(), step));
                     }
+                } else if let Some(page_str) = line.strip_prefix("PAGE:") {
+                    if let Ok(page) = page_str.trim().parse::<i32>() {
+                        let _ = app_stdout.emit("wake_page", (site_id_stdout.clone(), page));
+                    }
+                } else {
+                    eprintln!("[wake:{}] {}", site_id_stdout, line);
                 }
             }
         });
@@ -322,15 +328,10 @@ async fn run_wake_script(
                         let site_parse = site_id_clone.clone();
                         thread::spawn(move || {
                             let reader = BufReader::new(stdout);
-                            for line in reader.lines() {
-                                if let Ok(line) = line {
-                                    if line.starts_with("RESUME_DATA:") {
-                                        if let Some(json_str) = line.strip_prefix("RESUME_DATA:") {
-                                            let _ = app_parse.emit(
-                                                "parse_resume_data",
-                                                (site_parse.clone(), json_str),
-                                            );
-                                        }
+                            for line in reader.lines().flatten() {
+                                if line.starts_with("RESUME_DATA:") {
+                                    if let Some(json_str) = line.strip_prefix("RESUME_DATA:") {
+                                        let _ = app_parse.emit("parse_resume_data", (site_parse.clone(), json_str));
                                     }
                                 }
                             }
@@ -457,12 +458,10 @@ async fn run_parse_script(
     let site_id_for_stdout = site_id.clone();
     thread::spawn(move || {
         let reader = BufReader::new(stdout);
-        for line in reader.lines() {
-            if let Ok(line) = line {
-                if line.starts_with("RESUME_DATA:") {
-                    if let Some(json_str) = line.strip_prefix("RESUME_DATA:") {
-                        let _ = app_clone.emit("parse_resume_data", (site_id_for_stdout.clone(), json_str));
-                    }
+        for line in reader.lines().flatten() {
+            if line.starts_with("RESUME_DATA:") {
+                if let Some(json_str) = line.strip_prefix("RESUME_DATA:") {
+                    let _ = app_clone.emit("parse_resume_data", (site_id_for_stdout.clone(), json_str));
                 }
             }
         }
@@ -603,7 +602,7 @@ pub fn run() {
                             }
                         }
                         "quit" => {
-                            stop_all_running_scripts(&app);
+                            stop_all_running_scripts(app);
                             app.exit(0);
                         }
                         _ => {}
